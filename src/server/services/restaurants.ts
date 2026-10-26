@@ -357,3 +357,16 @@ export async function uploadRestaurantDocument(userId: string, restaurantId: str
   await assertRestaurantAccess(userId, restaurantId, "store.manage");
   await db.restaurantDocument.create({ data: { restaurantId, type: type.slice(0, 60), fileId } });
 }
+
+/** Admin: associa uma conta existente como proprietária (ex.: o próprio Super Admin para gerir o cardápio). */
+export async function adminAddRestaurantOwner(adminId: string, restaurantId: string, email: string) {
+  await assertAdmin(adminId, "restaurants.manage");
+  const user = await db.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+  if (!user || user.status !== "ACTIVE") throw new AppError("NOT_FOUND", "Não existe uma conta ativa com esse e-mail.");
+  await db.restaurantMember.upsert({
+    where: { restaurantId_userId: { restaurantId, userId: user.id } },
+    create: { restaurantId, userId: user.id, role: "OWNER" },
+    update: { role: "OWNER", isActive: true },
+  });
+  await audit({ actorId: adminId, action: "restaurant.owner_assign", entityType: "Restaurant", entityId: restaurantId, metadata: { userId: user.id } });
+}

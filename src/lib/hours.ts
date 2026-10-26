@@ -32,3 +32,30 @@ export function isWithinWindow(from: number | null, until: number | null, date: 
   const { minutes } = localTimeParts(date, timeZone);
   return until > from ? minutes >= from && minutes < until : minutes >= from || minutes < until;
 }
+
+/** Desvio (minutos) de um fuso horário num instante. */
+function tzOffsetMinutes(date: Date, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      .formatToParts(date)
+      .map((p) => [p.type, p.value]),
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return Math.round((asUtc - date.getTime()) / 60000);
+}
+
+/** Converte "AAAA-MM-DDTHH:mm" (hora local da plataforma) para Date UTC. */
+export function zonedToUtc(local: string, timeZone: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/.exec(local.trim());
+  if (!m) return null;
+  const guess = Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] ?? 0), +(m[5] ?? 0));
+  const offset = tzOffsetMinutes(new Date(guess), timeZone);
+  return new Date(guess - offset * 60000);
+}
+
+/** Formata uma data UTC como valor de <input type="datetime-local"> na hora da plataforma. */
+export function utcToLocalInput(date: Date | null | undefined, timeZone: string): string {
+  if (!date) return "";
+  const shifted = new Date(date.getTime() + tzOffsetMinutes(date, timeZone) * 60000);
+  return shifted.toISOString().slice(0, 16);
+}

@@ -133,3 +133,13 @@ describe("validação de uploads", () => {
     expect(detectType(Buffer.from("GIF89a......"))).toBeNull();
   });
 });
+
+import { zonedToUtc, utcToLocalInput } from "@/lib/hours";
+describe("fuso horário", () => {
+  it("converte hora local de Maputo para UTC e vice-versa", () => {
+    const d = zonedToUtc("2026-11-01T10:00", "Africa/Maputo")!;
+    expect(d.toISOString()).toBe("2026-11-01T08:00:00.000Z");
+    expect(utcToLocalInput(d, "Africa/Maputo")).toBe("2026-11-01T10:00");
+    expect(zonedToUtc("lixo", "Africa/Maputo")).toBeNull();
+  });
+});
