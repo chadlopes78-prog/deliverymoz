@@ -18,7 +18,7 @@ Use, por exemplo, Neon, Supabase ou o Postgres do Marketplace da Vercel. Escolha
 
 ## 3. Tarefas periódicas (Cron)
 
-`vercel.json` agenda `/api/cron/maintenance` **a cada 5 minutos**. A Vercel envia `Authorization: Bearer $CRON_SECRET` automaticamente quando `CRON_SECRET` está definido. A tarefa reconcilia pagamentos incertos, expira pedidos não pagos, reenvia ofertas de entrega e limpa sessões expiradas.
+`vercel.json` agenda `/api/cron/maintenance` **uma vez por dia** (limite do plano Hobby). Para operação real, chame o endpoint **a cada 5 minutos** (plano Pro: altere `schedule` para `*/5 * * * *`; ou use um agendador externo como cron-job.org com o cabeçalho `Authorization: Bearer <CRON_SECRET>`). A Vercel envia `Authorization: Bearer $CRON_SECRET` automaticamente quando `CRON_SECRET` está definido. A tarefa reconcilia pagamentos incertos, expira pedidos não pagos, reenvia ofertas de entrega e limpa sessões expiradas.
 > O plano Hobby da Vercel só permite crons diários. Use o plano Pro ou um agendador externo (ex.: cron-job.org) que chame o endpoint com o cabeçalho de autorização.
 
 ## 4. Armazenamento de imagens
