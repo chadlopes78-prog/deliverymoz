@@ -1,4 +1,6 @@
 import type { MetadataRoute } from "next";
+
+export const dynamic = "force-dynamic";
 import { db } from "@/server/db";
 import { getSettingsUncached } from "@/server/services/settings";
 import { PUBLIC_RESTAURANT_WHERE } from "@/server/services/availability";

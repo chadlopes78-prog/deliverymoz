@@ -1,4 +1,6 @@
 import type { MetadataRoute } from "next";
+
+export const dynamic = "force-dynamic";
 import { getSettingsUncached } from "@/server/services/settings";
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
