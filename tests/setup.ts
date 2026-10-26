@@ -1,3 +1,4 @@
+import "@/server/zod-config";
 // Testes usam exclusivamente a base de dados de testes (TEST_DATABASE_URL). Nunca a base de produção.
 const url = process.env.TEST_DATABASE_URL ?? "postgresql://deliverymoz:deliverymoz@localhost:5432/deliverymoz_test";
 if (!/test/i.test(url)) throw new Error("TEST_DATABASE_URL tem de apontar para uma base de dados de testes.");

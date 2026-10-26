@@ -90,13 +90,18 @@ export async function dailySeries(range: Range, restaurantId?: string) {
     WHERE "createdAt" >= ${range.from} AND "createdAt" <= ${range.to}
       ${restaurantId ? Prisma.sql`AND "restaurantId" = ${restaurantId}` : Prisma.empty}
     GROUP BY 1 ORDER BY 1`;
-  return rows.map((r) => ({
-    day: r.day.toISOString().slice(0, 10),
-    orders: Number(r.orders),
-    grossCents: Number(r.gross ?? 0),
-    commissionCents: Number(r.commission ?? 0),
-    cancelled: Number(r.cancelled),
-  }));
+  const byDay = new Map(rows.map((r) => [r.day.toISOString().slice(0, 10), r]));
+  // Preenche os dias sem pedidos com zero, para que a escala temporal dos gráficos seja real.
+  const out: { day: string; orders: number; grossCents: number; commissionCents: number; cancelled: number }[] = [];
+  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+  const last = fmt.format(range.to);
+  for (let t = range.from.getTime(), i = 0; i < 400; t += 86400_000, i++) {
+    const day = fmt.format(new Date(t));
+    const r = byDay.get(day);
+    out.push({ day, orders: Number(r?.orders ?? 0), grossCents: Number(r?.gross ?? 0), commissionCents: Number(r?.commission ?? 0), cancelled: Number(r?.cancelled ?? 0) });
+    if (day === last) break;
+  }
+  return out;
 }
 
 export async function topRestaurants(range: Range, take = 8) {

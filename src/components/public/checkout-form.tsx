@@ -1,9 +1,10 @@
 "use client";
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LocateFixed, Lock } from "lucide-react";
 import { Field, Input, Select, Textarea, Checkbox } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
+import { FormPendingContext, useServerForm } from "@/components/ui/form-pending";
 import { formatMoney } from "@/lib/money";
 import { placeOrderAction } from "@/app/(public)/actions";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ type Props = {
 };
 
 export function CheckoutForm(p: Props) {
-  const [state, action] = useActionState(placeOrderAction, null);
+  const { state, pending, onSubmit } = useServerForm(placeOrderAction);
   const defaultAddr = p.addresses.find((a) => p.zones.some((z) => z.neighborhoodId === a.neighborhoodId));
   const [addressId, setAddressId] = useState<string>(defaultAddr?.id ?? (p.addresses.length ? p.addresses[0].id : "new"));
   const [cityId, setCityId] = useState(p.defaultLocation.cityId ?? p.geography[0]?.id ?? "");
@@ -51,7 +52,8 @@ export function CheckoutForm(p: Props) {
   }
 
   return (
-    <form action={action} className="grid gap-6 lg:grid-cols-[1fr_340px]">
+    <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <FormPendingContext.Provider value={pending}>
       <input type="hidden" name="idempotencyKey" value={p.idempotencyKey} />
       <div className="space-y-6">
         <section className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
@@ -162,6 +164,7 @@ export function CheckoutForm(p: Props) {
           </SubmitButton>
         </div>
       </aside>
+      </FormPendingContext.Provider>
     </form>
   );
 }

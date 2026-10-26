@@ -12,6 +12,9 @@ import { CheckoutForm } from "@/components/public/checkout-form";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buttonClass } from "@/components/ui/button-class";
 
+// As ações desta página podem aguardar a confirmação M-Pesa no telemóvel (pedido síncrono).
+export const maxDuration = 120;
+
 export const metadata: Metadata = { title: "Finalizar pedido", robots: { index: false } };
 
 export default async function CheckoutPage() {

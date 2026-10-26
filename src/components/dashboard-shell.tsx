@@ -28,7 +28,7 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
         const active = isActive(i);
         return (
           <li key={i.href}>
-            <Link href={i.href} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition", active ? "bg-brand text-brand-contrast" : "text-ink/75 hover:bg-ink/5 hover:text-ink")}>
+            <Link href={i.href} prefetch={false} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition", active ? "bg-brand text-brand-contrast" : "text-ink/75 hover:bg-ink/5 hover:text-ink")}>
               <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
               <span className="flex-1 truncate">{i.label}</span>
               {i.badge ? <span className={cn("rounded-full px-1.5 text-xs font-bold", active ? "bg-white/25" : "bg-brand text-brand-contrast")}>{i.badge}</span> : null}
@@ -73,7 +73,7 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
                 const active = isActive(i);
                 return (
                   <li key={i.href}>
-                    <Link href={i.href} className={cn("relative flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] font-medium", active ? "text-brand" : "text-muted")}>
+                    <Link href={i.href} prefetch={false} className={cn("relative flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] font-medium", active ? "text-brand" : "text-muted")}>
                       <Icon className="h-5 w-5" aria-hidden />{i.label}
                       {i.badge ? <span className="absolute top-1 left-1/2 ml-2 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-contrast">{i.badge}</span> : null}
                     </Link>

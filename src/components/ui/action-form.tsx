@@ -1,7 +1,8 @@
 "use client";
-import { useActionState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { ActionResult } from "@/server/action";
 import { FormMessage } from "./form-message";
+import { FormPendingContext, useServerForm } from "./form-pending";
 
 export type FormAction = (prev: ActionResult, fd: FormData) => Promise<ActionResult>;
 
@@ -25,7 +26,7 @@ export function ActionForm({
   hideMessage?: boolean;
   id?: string;
 }) {
-  const [state, formAction] = useActionState(action, null);
+  const { state, pending, onSubmit } = useServerForm(action, confirmMessage);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) {
@@ -35,16 +36,8 @@ export function ActionForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
   return (
-    <form
-      id={id}
-      ref={ref}
-      action={formAction}
-      className={className}
-      onSubmit={(e) => {
-        if (confirmMessage && !window.confirm(confirmMessage)) e.preventDefault();
-      }}
-    >
-      {children}
+    <form id={id} ref={ref} className={className} aria-busy={pending || undefined} onSubmit={onSubmit}>
+      <FormPendingContext.Provider value={pending}>{children}</FormPendingContext.Provider>
       {!hideMessage && (state?.error || state?.message) ? (
         <div className="mt-3">
           <FormMessage state={state} />

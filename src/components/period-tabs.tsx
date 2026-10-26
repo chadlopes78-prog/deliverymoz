@@ -11,10 +11,10 @@ export function PeriodTabs({ current, base, extra }: { current: string; base: st
           <Link key={k} href={`${base}?periodo=${k}`} role="tab" aria-selected={current === k} className={cn("rounded-lg px-3 py-1.5 text-sm font-semibold", current === k ? "bg-brand text-brand-contrast" : "text-muted hover:text-ink")}>{label}</Link>
         ))}
       </div>
-      <form className="flex items-center gap-1 text-sm" action={base}>
-        <input type="date" name="de" aria-label="De" className="h-9 rounded-lg border border-line bg-surface px-2" />
+      <form className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-1 text-sm sm:flex sm:w-auto" action={base}>
+        <input type="date" name="de" aria-label="De" className="h-9 min-w-0 rounded-lg border border-line bg-surface px-2" />
         <span className="text-muted">a</span>
-        <input type="date" name="ate" aria-label="Até" className="h-9 rounded-lg border border-line bg-surface px-2" />
+        <input type="date" name="ate" aria-label="Até" className="h-9 min-w-0 rounded-lg border border-line bg-surface px-2" />
         <button className="h-9 rounded-lg border border-line bg-surface px-3 font-semibold">OK</button>
       </form>
       {extra}

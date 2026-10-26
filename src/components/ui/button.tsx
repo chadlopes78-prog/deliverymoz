@@ -3,6 +3,7 @@ import { forwardRef } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { buttonClass, type Variant, type Size } from "./button-class";
+import { useFormPendingContext } from "./form-pending";
 
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; loading?: boolean };
@@ -21,7 +22,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
 /** Botão de submissão que mostra carregamento e impede cliques repetidos enquanto o formulário é enviado. */
 export function SubmitButton({ children, pendingText, ...props }: ButtonProps & { pendingText?: string }) {
-  const { pending } = useFormStatus();
+  const status = useFormStatus();
+  const contextPending = useFormPendingContext();
+  const pending = status.pending || contextPending;
   return (
     <Button type="submit" loading={pending} {...props}>
       {pending && pendingText ? pendingText : children}

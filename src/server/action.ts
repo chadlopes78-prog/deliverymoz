@@ -1,4 +1,5 @@
 import "server-only";
+import "./zod-config";
 import { ZodError } from "zod";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { isAppError } from "./errors";

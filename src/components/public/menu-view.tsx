@@ -153,7 +153,7 @@ function ProductModal({ product, currency, orderable, closedLabel, onClose }: { 
             <span className="w-8 text-center font-semibold tabular-nums" aria-live="polite">{qty}</span>
             <button type="button" onClick={() => setQty((q) => Math.min(50, q + 1))} className="grid h-11 w-11 place-items-center" aria-label="Aumentar quantidade"><Plus className="h-4 w-4" /></button>
           </div>
-          <Button type="submit" className="flex-1" size="lg" disabled={!canAdd} loading={pending}>
+          <Button type="submit" className="min-w-0 flex-1 whitespace-normal px-3 text-sm leading-tight sm:text-base" size="lg" disabled={!canAdd} loading={pending}>
             {!orderable ? closedLabel : !product.available ? "Indisponível" : missing ? `Escolha: ${missing.name}` : `Adicionar · ${formatMoney(unit * qty, currency)}`}
           </Button>
         </form>

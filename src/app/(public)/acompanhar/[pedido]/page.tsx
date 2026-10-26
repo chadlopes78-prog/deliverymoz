@@ -20,6 +20,9 @@ import { cancelOrderAction, retryPaymentAction, reviewAction } from "../../actio
 import { cn } from "@/lib/utils";
 import type { OrderStatus } from "@prisma/client";
 
+// As ações desta página podem aguardar a confirmação M-Pesa no telemóvel (pedido síncrono).
+export const maxDuration = 120;
+
 export const metadata: Metadata = { title: "Acompanhar pedido", robots: { index: false } };
 
 const STEPS: { status: OrderStatus[]; label: string }[] = [
