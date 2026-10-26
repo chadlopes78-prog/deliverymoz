@@ -5,7 +5,12 @@ import { db } from "../db";
 export async function getSettingsUncached() {
   const existing = await db.platformSettings.findUnique({ where: { id: 1 } });
   if (existing) return existing;
-  return db.platformSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  try {
+    return await db.platformSettings.create({ data: { id: 1 } });
+  } catch {
+    // Outro pedido criou a linha em simultâneo (primeiro arranque).
+    return db.platformSettings.findUniqueOrThrow({ where: { id: 1 } });
+  }
 }
 
 export const getSettings = cache(getSettingsUncached);
