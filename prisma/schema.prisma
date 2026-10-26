@@ -1,0 +1,1114 @@
+// Esquema da base de dados da plataforma DeliveryMoz.
+// Valores monetários são guardados em unidades menores (centavos) como inteiros.
+// A moeda de cada pedido é registada no próprio pedido (não é fixa no código).
+
+generator client {
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────── Utilizadores e acesso ───────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum StaffRole {
+  OPERATIONS
+  FINANCE
+  SUPPORT
+  RESTAURANT_MANAGEMENT
+}
+
+enum RestaurantRole {
+  OWNER
+  MANAGER
+  ORDER_OPERATOR
+}
+
+model User {
+  id                   String     @id @default(cuid())
+  name                 String
+  email                String?    @unique
+  phone                String?    @unique
+  passwordHash         String
+  status               UserStatus @default(ACTIVE)
+  suspendedReason      String?
+  isSuperAdmin         Boolean    @default(false)
+  emailVerifiedAt      DateTime?
+  notifyEmailOrders    Boolean    @default(true)
+  notifyEmailMarketing Boolean    @default(false)
+  notifyInApp          Boolean    @default(true)
+  locationConsentAt    DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  lastLoginAt          DateTime?
+  closedAt             DateTime?
+
+  sessions            Session[]
+  passwordResets      PasswordResetToken[]
+  staff               StaffMember?
+  restaurantMembers   RestaurantMember[]
+  courier             Courier?
+  addresses           Address[]
+  orders              Order[]              @relation("CustomerOrders")
+  favorites           Favorite[]
+  notifications       Notification[]
+  reviews             Review[]
+  tickets             SupportTicket[]      @relation("TicketCreator")
+  assignedTickets     SupportTicket[]      @relation("TicketAssignee")
+  ticketMessages      TicketMessage[]
+  auditLogs           AuditLog[]
+  carts               Cart[]
+  couponRedemptions   CouponRedemption[]
+  files               StoredFile[]
+  orderEvents         OrderStatusEvent[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Session {
+  id         String   @id // hash SHA-256 do token; o token em claro só existe no cookie
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  userAgent  String?
+  ip         String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model StaffMember {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      StaffRole
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model RateLimit {
+  key         String   @id
+  count       Int
+  windowStart DateTime
+}
+
+// ─────────────────────────────── Configuração da plataforma ───────────────────────────────
+
+model PlatformSettings {
+  id                      Int       @id @default(1)
+  platformName            String    @default("DeliveryMoz")
+  tagline                 String?
+  logoFileId              String?
+  primaryColor            String    @default("#E8452C")
+  accentColor             String    @default("#1F7A5A")
+  currency                String    @default("MZN")
+  countryCode             String    @default("MZ")
+  locale                  String    @default("pt-MZ")
+  timezone                String    @default("Africa/Maputo")
+  supportEmail            String?
+  supportPhone            String?
+  whatsapp                String?
+  companyLegalName        String?
+  companyAddress          String?
+  siteUrl                 String?
+  // Taxas e regras
+  serviceFeeBps           Int       @default(0) // taxa de serviço (percentagem em pontos-base)
+  serviceFeeFixedCents    Int       @default(0)
+  serviceFeeMaxCents      Int?
+  defaultCommissionBps    Int       @default(1200)
+  courierFeeShareBps      Int       @default(10000) // percentagem da taxa de entrega paga ao entregador
+  courierBaseFeeCents     Int       @default(0) // valor mínimo garantido ao entregador por entrega
+  deliveryOfferTimeoutSec Int       @default(90)
+  paymentTimeoutMinutes   Int       @default(30)
+  customerCancelWindow    String    @default("BEFORE_ACCEPT") // BEFORE_ACCEPT | NEVER
+  cancellationPolicy      String?
+  termsContent            String?
+  privacyContent          String?
+  registrationOpen        Boolean   @default(true)
+  partnerSignupOpen       Boolean   @default(true)
+  courierSignupOpen       Boolean   @default(true)
+  emailNotificationsOn    Boolean   @default(true)
+  requireLoginToBrowse    Boolean   @default(false)
+  setupCompletedAt        DateTime?
+  updatedAt               DateTime  @updatedAt
+}
+
+model City {
+  id            String         @id @default(cuid())
+  name          String
+  slug          String         @unique
+  countryCode   String         @default("MZ")
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  neighborhoods Neighborhood[]
+  restaurants   Restaurant[]
+  addresses     Address[]
+  couriers      Courier[]
+  banners       Banner[]
+  campaigns     Campaign[]
+  coupons       Coupon[]
+
+  @@unique([countryCode, name])
+}
+
+model Neighborhood {
+  id            String         @id @default(cuid())
+  cityId        String
+  city          City           @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  name          String
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  zones         DeliveryZone[]
+  addresses     Address[]
+  restaurants   Restaurant[]
+
+  @@unique([cityId, name])
+}
+
+model CuisineCategory {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  slug        String       @unique
+  emoji       String?
+  position    Int          @default(0)
+  isActive    Boolean      @default(true)
+  restaurants Restaurant[]
+}
+
+enum PaymentProviderKey {
+  MPESA
+  EMOLA
+  CARD
+  CASH_ON_DELIVERY
+  TEST
+}
+
+enum ProviderMode {
+  SANDBOX
+  LIVE
+}
+
+model PaymentProviderConfig {
+  key         PaymentProviderKey @id
+  enabled     Boolean            @default(false)
+  mode        ProviderMode       @default(SANDBOX)
+  displayName String
+  instructions String?
+  updatedAt   DateTime           @updatedAt
+}
+
+// ─────────────────────────────── Ficheiros ───────────────────────────────
+
+enum FileVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+model StoredFile {
+  id          String         @id @default(cuid())
+  ownerId     String?
+  owner       User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  visibility  FileVisibility
+  purpose     String // ex.: restaurant_logo, product_image, courier_document
+  mimeType    String
+  size        Int
+  sha256      String
+  width       Int?
+  height      Int?
+  driver      String // db | vercel-blob
+  data        Bytes?
+  url         String?
+  originalName String?
+  createdAt   DateTime       @default(now())
+
+  @@index([ownerId])
+}
+
+// ─────────────────────────────── Restaurantes ───────────────────────────────
+
+enum RestaurantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum DeliveryMode {
+  RESTAURANT
+  PLATFORM
+}
+
+model Restaurant {
+  id                     String            @id @default(cuid())
+  slug                   String            @unique
+  name                   String
+  legalName              String?
+  nuit                   String?
+  description            String?
+  phone                  String
+  email                  String?
+  responsibleName        String
+  logoFileId             String?
+  coverFileId            String?
+  cityId                 String
+  city                   City              @relation(fields: [cityId], references: [id])
+  neighborhoodId         String?
+  neighborhood           Neighborhood?     @relation(fields: [neighborhoodId], references: [id])
+  addressLine            String
+  addressReference       String?
+  latitude               Float?
+  longitude              Float?
+  status                 RestaurantStatus  @default(PENDING)
+  statusReason           String?
+  approvedAt             DateTime?
+  acceptingOrders        Boolean           @default(true) // pausa manual da loja
+  prepTimeMinutes        Int               @default(30)
+  minOrderCents          Int               @default(0)
+  allowRestaurantDelivery Boolean          @default(true)
+  allowPlatformDelivery  Boolean           @default(false)
+  deliveryMode           DeliveryMode      @default(RESTAURANT)
+  acceptsCashOnDelivery  Boolean           @default(true)
+  payoutDetails          String? // instruções de liquidação (ex.: número M-Pesa / conta bancária)
+  businessInfo           String?
+  isFeatured             Boolean           @default(false)
+  ratingAvg              Float             @default(0)
+  ratingCount            Int               @default(0)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  cuisines        CuisineCategory[]
+  members         RestaurantMember[]
+  hours           RestaurantHour[]
+  zones           DeliveryZone[]
+  menuCategories  MenuCategory[]
+  products        Product[]
+  orders          Order[]
+  reviews         Review[]
+  favorites       Favorite[]
+  commissionRules CommissionRule[]
+  settlements     Settlement[]
+  documents       RestaurantDocument[]
+  carts           Cart[]
+  coupons         Coupon[]          @relation("CouponRestaurants")
+  campaigns       Campaign[]
+
+  @@index([status, cityId])
+  @@index([name])
+}
+
+model RestaurantMember {
+  id           String         @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         RestaurantRole
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+
+  @@unique([restaurantId, userId])
+  @@index([userId])
+}
+
+model RestaurantDocument {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  type         String
+  fileId       String
+  createdAt    DateTime   @default(now())
+}
+
+model RestaurantHour {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  dayOfWeek    Int // 0 = domingo
+  opensAt      Int // minutos desde a meia-noite
+  closesAt     Int // minutos desde a meia-noite (se menor que opensAt, fecha no dia seguinte)
+
+  @@index([restaurantId, dayOfWeek])
+}
+
+model DeliveryZone {
+  id             String       @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  neighborhoodId String
+  neighborhood   Neighborhood @relation(fields: [neighborhoodId], references: [id], onDelete: Cascade)
+  feeCents       Int
+  etaMinutes     Int          @default(30)
+  isActive       Boolean      @default(true)
+
+  @@unique([restaurantId, neighborhoodId])
+  @@index([neighborhoodId])
+}
+
+model CommissionRule {
+  id            String      @id @default(cuid())
+  restaurantId  String? // nulo = regra global
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  percentageBps Int
+  fixedCents    Int         @default(0)
+  effectiveFrom DateTime
+  createdById   String?
+  note          String?
+  createdAt     DateTime    @default(now())
+
+  @@index([restaurantId, effectiveFrom])
+}
+
+// ─────────────────────────────── Cardápio ───────────────────────────────
+
+enum ProductStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+model MenuCategory {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  position     Int        @default(0)
+  isActive     Boolean    @default(true)
+  products     Product[]
+
+  @@index([restaurantId, position])
+}
+
+model Product {
+  id             String        @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  categoryId     String?
+  category       MenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  slug           String
+  name           String
+  description    String?
+  priceCents     Int
+  imageFileId    String?
+  status         ProductStatus @default(ACTIVE)
+  isFeatured     Boolean       @default(false)
+  position       Int           @default(0)
+  availableFrom  Int? // minutos desde a meia-noite
+  availableUntil Int?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  optionGroups OptionGroup[]
+  orderItems   OrderItem[]
+  cartItems    CartItem[]
+
+  @@unique([restaurantId, slug])
+  @@index([restaurantId, status])
+  @@index([name])
+}
+
+model OptionGroup {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  minSelect Int      @default(0)
+  maxSelect Int      @default(1)
+  position  Int      @default(0)
+  options   Option[]
+}
+
+model Option {
+  id              String      @id @default(cuid())
+  groupId         String
+  group           OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name            String
+  priceDeltaCents Int         @default(0)
+  isAvailable     Boolean     @default(true)
+  position        Int         @default(0)
+}
+
+// ─────────────────────────────── Clientes ───────────────────────────────
+
+model Address {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label          String       @default("Casa")
+  cityId         String
+  city           City         @relation(fields: [cityId], references: [id])
+  neighborhoodId String
+  neighborhood   Neighborhood @relation(fields: [neighborhoodId], references: [id])
+  street         String
+  reference      String?
+  latitude       Float?
+  longitude      Float?
+  isDefault      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([userId])
+}
+
+model Favorite {
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@id([userId, restaurantId])
+}
+
+model Cart {
+  id           String      @id @default(cuid())
+  tokenHash    String?     @unique // carrinho anónimo identificado por cookie
+  userId       String?     @unique
+  user         User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  couponCode   String?
+  updatedAt    DateTime    @updatedAt
+  createdAt    DateTime    @default(now())
+  items        CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+  optionIds String[]
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([cartId])
+}
+
+// ─────────────────────────────── Pedidos ───────────────────────────────
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PLACED
+  ACCEPTED
+  PREPARING
+  READY_FOR_PICKUP
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+model Order {
+  id                    String             @id @default(cuid())
+  code                  String             @unique
+  customerId            String
+  customer              User               @relation("CustomerOrders", fields: [customerId], references: [id])
+  restaurantId          String
+  restaurant            Restaurant         @relation(fields: [restaurantId], references: [id])
+  status                OrderStatus
+  paymentStatus         PaymentStatus      @default(PENDING)
+  paymentMethod         PaymentProviderKey
+  deliveryMode          DeliveryMode
+  currency              String
+  // Instantâneo dos dados do cliente/endereço no momento do pedido
+  customerName          String
+  customerPhone         String
+  cityId                String
+  cityName              String
+  neighborhoodId        String
+  neighborhoodName      String
+  street                String
+  addressReference      String?
+  latitude              Float?
+  longitude             Float?
+  notesForRestaurant    String?
+  notesForDelivery      String?
+  // Valores (centavos)
+  subtotalCents         Int
+  discountCents         Int                @default(0)
+  discountFundedBy      String? // PLATFORM | RESTAURANT
+  deliveryFeeCents      Int
+  serviceFeeCents       Int                @default(0)
+  totalCents            Int
+  commissionBps         Int
+  commissionFixedCents  Int                @default(0)
+  commissionCents       Int
+  restaurantNetCents    Int
+  courierFeeCents       Int                @default(0)
+  couponId              String?
+  coupon                Coupon?            @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  prepTimeMinutes       Int?
+  estimatedReadyAt      DateTime?
+  idempotencyKey        String
+  cancelReason          String?
+  cancelledByRole       String?
+  rejectReason          String?
+  cashCollectedAt       DateTime?
+  cashCollectedById     String?
+  settlementId          String?
+  settlement            Settlement?        @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+  placedAt              DateTime?
+  acceptedAt            DateTime?
+  readyAt               DateTime?
+  pickedUpAt            DateTime?
+  deliveredAt           DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  items       OrderItem[]
+  events      OrderStatusEvent[]
+  payments    Payment[]
+  refunds     Refund[]
+  delivery    Delivery?
+  review      Review?
+  redemption  CouponRedemption?
+  tickets     SupportTicket[]
+
+  @@unique([customerId, idempotencyKey])
+  @@index([restaurantId, status])
+  @@index([restaurantId, createdAt])
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([customerId, createdAt])
+}
+
+model OrderItem {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName    String
+  basePriceCents Int
+  unitPriceCents Int
+  quantity       Int
+  totalCents     Int
+  options        Json // [{group, name, priceDeltaCents}]
+  notes          String?
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderStatusEvent {
+  id          String       @id @default(cuid())
+  orderId     String
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  actorId     String?
+  actor       User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole   String
+  note        String?
+  createdAt   DateTime     @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+// ─────────────────────────────── Pagamentos ───────────────────────────────
+
+model Payment {
+  id                    String             @id @default(cuid())
+  orderId               String
+  order                 Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider              PaymentProviderKey
+  status                PaymentStatus      @default(PENDING)
+  amountCents           Int
+  currency              String
+  reference             String             @unique // referência enviada ao fornecedor
+  providerTransactionId String?
+  providerConversationId String?
+  payerPhone            String?
+  failureCode           String?
+  failureMessage        String?
+  attempts              Int                @default(0)
+  lastCheckedAt         DateTime?
+  paidAt                DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  events                PaymentEvent[]
+  refunds               Refund[]
+
+  @@unique([provider, providerTransactionId])
+  @@index([orderId])
+  @@index([status, createdAt])
+}
+
+model PaymentEvent {
+  id        String   @id @default(cuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  type      String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([paymentId, createdAt])
+}
+
+model WebhookEvent {
+  id             String             @id @default(cuid())
+  provider       PaymentProviderKey
+  eventId        String
+  signatureValid Boolean
+  payload        Json
+  processedAt    DateTime?
+  error          String?
+  createdAt      DateTime           @default(now())
+
+  @@unique([provider, eventId])
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REJECTED
+}
+
+model Refund {
+  id            String       @id @default(cuid())
+  orderId       String
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentId     String?
+  payment       Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  amountCents   Int
+  status        RefundStatus @default(PENDING)
+  reason        String
+  requestedById String?
+  processedById String?
+  providerRef   String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  processedAt   DateTime?
+
+  @@index([status])
+  @@index([orderId])
+}
+
+// ─────────────────────────────── Entregas ───────────────────────────────
+
+enum CourierStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum VehicleType {
+  BICYCLE
+  MOTORCYCLE
+  CAR
+  ON_FOOT
+}
+
+model Courier {
+  id            String          @id @default(cuid())
+  userId        String          @unique
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cityId        String
+  city          City            @relation(fields: [cityId], references: [id])
+  vehicleType   VehicleType
+  vehiclePlate  String?
+  idNumber      String?
+  status        CourierStatus   @default(PENDING)
+  statusReason  String?
+  isAvailable   Boolean         @default(false)
+  payoutDetails String?
+  approvedAt    DateTime?
+  lastLatitude  Float?
+  lastLongitude Float?
+  lastLocationAt DateTime?
+  ratingAvg     Float           @default(0)
+  ratingCount   Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  documents  CourierDocument[]
+  deliveries Delivery[]
+  offers     DeliveryOffer[]
+  payouts    CourierPayout[]
+  issues     DeliveryIssue[]
+
+  @@index([status, cityId, isAvailable])
+}
+
+model CourierDocument {
+  id        String   @id @default(cuid())
+  courierId String
+  courier   Courier  @relation(fields: [courierId], references: [id], onDelete: Cascade)
+  type      String // ID_CARD | DRIVER_LICENSE | VEHICLE_REGISTRATION | OTHER
+  fileId    String
+  createdAt DateTime @default(now())
+}
+
+enum DeliveryStatus {
+  SEARCHING
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+model Delivery {
+  id             String         @id @default(cuid())
+  orderId        String         @unique
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status         DeliveryStatus @default(SEARCHING)
+  courierId      String?
+  courier        Courier?       @relation(fields: [courierId], references: [id], onDelete: SetNull)
+  cityId         String
+  courierFeeCents Int
+  dispatchRound  Int            @default(0)
+  assignedAt     DateTime?
+  pickedUpAt     DateTime?
+  deliveredAt    DateTime?
+  cancelledAt    DateTime?
+  courierPayoutId String?
+  courierPayout  CourierPayout? @relation(fields: [courierPayoutId], references: [id], onDelete: SetNull)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  offers         DeliveryOffer[]
+  issues         DeliveryIssue[]
+
+  @@index([status, cityId])
+  @@index([courierId, status])
+}
+
+enum OfferStatus {
+  OFFERED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+model DeliveryOffer {
+  id         String      @id @default(cuid())
+  deliveryId String
+  delivery   Delivery    @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  courierId  String
+  courier    Courier     @relation(fields: [courierId], references: [id], onDelete: Cascade)
+  status     OfferStatus @default(OFFERED)
+  expiresAt  DateTime
+  respondedAt DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@unique([deliveryId, courierId])
+  @@index([courierId, status])
+}
+
+model DeliveryIssue {
+  id          String    @id @default(cuid())
+  deliveryId  String
+  delivery    Delivery  @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  courierId   String?
+  courier     Courier?  @relation(fields: [courierId], references: [id], onDelete: SetNull)
+  type        String
+  description String
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model CourierPayout {
+  id          String     @id @default(cuid())
+  courierId   String
+  courier     Courier    @relation(fields: [courierId], references: [id], onDelete: Cascade)
+  amountCents Int
+  currency    String
+  status      String     @default("PENDING") // PENDING | PAID
+  reference   String?
+  paidAt      DateTime?
+  createdById String?
+  createdAt   DateTime   @default(now())
+  deliveries  Delivery[]
+}
+
+// ─────────────────────────────── Financeiro ───────────────────────────────
+
+enum SettlementStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model Settlement {
+  id           String           @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id])
+  periodEnd    DateTime
+  amountCents  Int
+  currency     String
+  orderCount   Int
+  status       SettlementStatus @default(PENDING)
+  reference    String?
+  notes        String?
+  paidAt       DateTime?
+  createdById  String?
+  createdAt    DateTime         @default(now())
+  orders       Order[]
+
+  @@index([restaurantId, createdAt])
+}
+
+// ─────────────────────────────── Marketing ───────────────────────────────
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+model Coupon {
+  id                String             @id @default(cuid())
+  code              String             @unique
+  description       String?
+  type              DiscountType
+  value             Int // bps para PERCENT, centavos para FIXED
+  maxDiscountCents  Int?
+  minSubtotalCents  Int                @default(0)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  usageLimitTotal   Int?
+  usageLimitPerUser Int?               @default(1)
+  usedCount         Int                @default(0)
+  fundedBy          String             @default("PLATFORM") // PLATFORM | RESTAURANT
+  firstOrderOnly    Boolean            @default(false)
+  cityId            String?
+  city              City?              @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  campaignId        String?
+  campaign          Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  restaurants       Restaurant[]       @relation("CouponRestaurants")
+  redemptions       CouponRedemption[]
+  orders            Order[]
+}
+
+model CouponRedemption {
+  id            String   @id @default(cuid())
+  couponId      String
+  coupon        Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discountCents Int
+  voided        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([couponId, userId])
+}
+
+model Campaign {
+  id           String      @id @default(cuid())
+  name         String
+  description  String?
+  cityId       String?
+  city         City?       @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  coupons      Coupon[]
+}
+
+model Banner {
+  id          String    @id @default(cuid())
+  title       String
+  subtitle    String?
+  imageFileId String?
+  linkUrl     String?
+  cityId      String?
+  city        City?     @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  position    Int       @default(0)
+  isActive    Boolean   @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// ─────────────────────────────── Avaliações ───────────────────────────────
+
+enum ReviewStatus {
+  PUBLISHED
+  HIDDEN
+}
+
+model Review {
+  id           String       @id @default(cuid())
+  orderId      String       @unique
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerId   String
+  customer     User         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rating       Int
+  comment      String?
+  status       ReviewStatus @default(PUBLISHED)
+  reply        String?
+  repliedAt    DateTime?
+  createdAt    DateTime     @default(now())
+
+  @@index([restaurantId, status, createdAt])
+}
+
+// ─────────────────────────────── Notificações e suporte ───────────────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  status    String // SENT | FAILED | NOT_CONFIGURED | DISABLED
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  ORDER
+  PAYMENT
+  DELIVERY
+  PRODUCT
+  REFUND
+  ACCOUNT
+  RESTAURANT
+  OTHER
+}
+
+model SupportTicket {
+  id           String          @id @default(cuid())
+  code         String          @unique
+  creatorId    String
+  creator      User            @relation("TicketCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  orderId      String?
+  order        Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  category     TicketCategory
+  priority     TicketPriority  @default(MEDIUM)
+  status       TicketStatus    @default(OPEN)
+  subject      String
+  assignedToId String?
+  assignedTo   User?           @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  resolvedAt   DateTime?
+  messages     TicketMessage[]
+
+  @@index([status, priority])
+  @@index([creatorId])
+}
+
+model TicketMessage {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body       String
+  isInternal Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+// ─────────────────────────────── Auditoria e erros ───────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+model ErrorLog {
+  id        String   @id @default(cuid())
+  source    String
+  message   String
+  stack     String?
+  context   Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
