@@ -8,11 +8,12 @@ import { DAY_NAMES } from "@/lib/utils";
 
 type Shift = { opens: string; closes: string };
 
-export function HoursEditor({ action, initial }: { action: FormAction; initial: Shift[][] }) {
+export function HoursEditor({ action, initial, hidden }: { action: FormAction; initial: Shift[][]; hidden?: Record<string, string> }) {
   const [days, setDays] = useState<Shift[][]>(initial);
   const set = (d: number, shifts: Shift[]) => setDays((all) => all.map((x, i) => (i === d ? shifts : x)));
   return (
     <ActionForm action={action} className="space-y-3">
+      {hidden && Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       {days.map((shifts, d) => (
         <div key={d} className="rounded-2xl border border-line bg-surface p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

@@ -540,7 +540,7 @@ export async function adminZoneAction(_: ActionResult, fd: FormData): Promise<Ac
     const { upsertZone } = await import("@/server/services/restaurants");
     const fee = money(fd, "fee", false);
     if (fee == null) throw new AppError("VALIDATION", "Indique a taxa de entrega (0 para grátis).");
-    await upsertZone(admin.id, str(fd, "restaurantId"), { neighborhoodId: str(fd, "neighborhoodId"), feeCents: fee, etaMinutes: int(fd, "etaMinutes", 30), isActive: fd.has("isActive") ? bool(fd, "isActive") : true });
+    await upsertZone(admin.id, str(fd, "restaurantId"), { neighborhoodId: str(fd, "neighborhoodId"), feeCents: fee, etaMinutes: int(fd, "etaMinutes", 30), isActive: fd.has("hasActive") ? bool(fd, "isActive") : true });
     revalidatePath("/", "layout");
   }, "Zona de entrega guardada.");
 }
@@ -620,7 +620,7 @@ export async function adminCategoryAction(_: ActionResult, fd: FormData): Promis
       restaurantId = c.restaurantId;
     }
     if (!restaurantId) throw new AppError("VALIDATION", "Escolha o restaurante.");
-    await saveMenuCategory(admin.id, restaurantId, { id, name: str(fd, "name"), description: optStr(fd, "description"), isActive: fd.has("isActive") ? bool(fd, "isActive") : true });
+    await saveMenuCategory(admin.id, restaurantId, { id, name: str(fd, "name"), description: optStr(fd, "description"), isActive: fd.has("hasActive") ? bool(fd, "isActive") : true });
     revalidatePath("/", "layout");
   }, "Categoria guardada.");
 }

@@ -14,14 +14,16 @@ import { ActionForm } from "@/components/ui/action-form";
 import { Checkbox, Field, Input } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ReasonForm, QuickAction } from "@/components/reason-form";
-import { RestaurantStatusBadge } from "@/components/admin/restaurant-status";
+import { QuickAction } from "@/components/reason-form";
+import { RestaurantOperationalBadge } from "@/components/admin/restaurant-status";
+import { RestaurantStatusActions } from "@/components/admin/restaurant-actions";
+import { buttonClass } from "@/components/ui/button-class";
 import { OrderStatusBadge, formatDate, DELIVERY_MODE_LABEL } from "@/components/status";
 import { RESTAURANT_ROLE_LABEL } from "@/server/permissions";
 import { formatMoney } from "@/lib/money";
 import { formatPhone } from "@/lib/utils";
 import { fileUrl } from "@/server/storage/files";
-import { restaurantStatusAction, restaurantCommercialAction, commissionAction, reviewModerationAction, createSettlementAction, assignOwnerAction } from "@/app/admin/actions";
+import { restaurantCommercialAction, commissionAction, reviewModerationAction, createSettlementAction, assignOwnerAction } from "@/app/admin/actions";
 
 export default async function AdminRestaurantDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ criado?: string }> }) {
   const { id } = await params;
@@ -53,16 +55,10 @@ export default async function AdminRestaurantDetail({ params, searchParams }: { 
   return (
     <>
       <Link href="/admin/restaurantes" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-brand"><ArrowLeft className="h-4 w-4" /> Restaurantes</Link>
-      {sp.criado && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">Restaurante criado. O proprietário pode agora gerir o cardápio em /parceiro.</p>}
-      <PageHeader title={r.name} description={`${r.city.name} · registado em ${formatDate(r.createdAt, { dateStyle: "medium" })}`} actions={<RestaurantStatusBadge status={r.status} />} />
+      {sp.criado && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" role="status">Restaurante criado. Para o publicar, defina o horário e as zonas de entrega em <Link href={`/admin/restaurantes/${r.id}/editar`} className="font-semibold underline">Editar</Link> e adicione produtos em <Link href={`/admin/produtos/novo?restaurante=${r.id}`} className="font-semibold underline">Produtos</Link>.</p>}
+      <PageHeader title={r.name} description={`${r.city.name} · registado em ${formatDate(r.createdAt, { dateStyle: "medium" })}`} actions={<><RestaurantOperationalBadge status={r.status} acceptingOrders={r.acceptingOrders} />{manage && <Link href={`/admin/restaurantes/${r.id}/editar`} className={buttonClass("primary", "sm")}>Editar restaurante</Link>}</>} />
 
-      {manage && (
-        <div className="mb-5 flex flex-wrap items-start gap-2">
-          {(r.status === "PENDING" || r.status === "REJECTED" || r.status === "SUSPENDED") && <QuickAction action={restaurantStatusAction} hidden={{ id: r.id, status: "APPROVED" }} label={r.status === "SUSPENDED" ? "Reativar" : "Aprovar"} variant="accent" confirmMessage="Confirmar aprovação?" />}
-          {r.status === "PENDING" && <ReasonForm action={restaurantStatusAction} hidden={{ id: r.id, status: "REJECTED" }} label="Rejeitar candidatura" variant="danger" placeholder="Motivo da rejeição (enviado ao restaurante)" />}
-          {r.status === "APPROVED" && <ReasonForm action={restaurantStatusAction} hidden={{ id: r.id, status: "SUSPENDED" }} label="Suspender" variant="danger" placeholder="Motivo da suspensão" />}
-        </div>
-      )}
+      {manage && <div className="mb-5"><RestaurantStatusActions r={r} /></div>}
       {r.statusReason && <p className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-800">Motivo registado: {r.statusReason}</p>}
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -168,11 +164,11 @@ export default async function AdminRestaurantDetail({ params, searchParams }: { 
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Cardápio" description={`${r.menuCategories.length} categorias · ${r.products.filter((p) => p.status === "ACTIVE").length} produtos ativos`} />
+          <CardHeader title="Cardápio" description={`${r.menuCategories.length} categorias · ${r.products.filter((p) => p.status === "ACTIVE").length} produtos ativos`} action={<Link href={`/admin/produtos?restaurante=${r.id}`} className="text-sm font-semibold text-brand">Gerir produtos</Link>} />
           <CardBody>
             {r.products.length === 0 ? <p className="text-sm text-muted">Este restaurante ainda não adicionou produtos ao seu cardápio.</p> : (
               <ul className="max-h-96 space-y-1 overflow-y-auto text-sm">
-                {r.products.map((p) => <li key={p.id} className="flex justify-between gap-2"><span className={p.status !== "ACTIVE" ? "text-muted line-through" : ""}>{p.name}</span><span className="tabular-nums">{formatMoney(p.priceCents, cur)}</span></li>)}
+                {r.products.map((p) => <li key={p.id} className="flex justify-between gap-2"><Link href={`/admin/produtos/${p.id}`} className="hover:text-brand"><span className={p.status !== "ACTIVE" ? "text-muted line-through" : ""}>{p.name}</span></Link><span className="tabular-nums">{formatMoney(p.priceCents, cur)}</span></li>)}
               </ul>
             )}
           </CardBody>

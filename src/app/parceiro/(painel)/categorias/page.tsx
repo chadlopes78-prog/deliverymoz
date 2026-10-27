@@ -35,6 +35,7 @@ export default async function Categories() {
                   <details className="mt-2"><summary className="cursor-pointer text-sm font-semibold text-brand">Editar</summary>
                     <ActionForm action={categoryAction} className="mt-2 space-y-2">
                       <input type="hidden" name="id" value={c.id} />
+                      <input type="hidden" name="hasActive" value="1" />
                       <Input name="name" defaultValue={c.name} required aria-label="Nome" />
                       <Input name="description" defaultValue={c.description ?? ""} placeholder="Descrição (opcional)" aria-label="Descrição" />
                       <Checkbox name="isActive" defaultChecked={c.isActive} label="Visível no cardápio" />

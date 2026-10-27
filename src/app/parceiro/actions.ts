@@ -86,7 +86,7 @@ export async function pauseStoreAction(_: ActionResult, fd: FormData): Promise<A
 export async function categoryAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const ctx = await requirePartner("menu.manage");
   return runAction(async () => {
-    await saveMenuCategory(ctx.user.id, ctx.restaurantId, { id: optStr(fd, "id"), name: str(fd, "name"), description: optStr(fd, "description"), isActive: fd.has("isActive") ? bool(fd, "isActive") : true });
+    await saveMenuCategory(ctx.user.id, ctx.restaurantId, { id: optStr(fd, "id"), name: str(fd, "name"), description: optStr(fd, "description"), isActive: fd.has("hasActive") ? bool(fd, "isActive") : true });
     revalidatePath("/parceiro", "layout");
   }, "Categoria guardada.");
 }
@@ -196,7 +196,7 @@ export async function zoneAction(_: ActionResult, fd: FormData): Promise<ActionR
   return runAction(async () => {
     const fee = parseMoneyToCents(str(fd, "fee"));
     if (fee == null) throw new AppError("VALIDATION", "Indique a taxa de entrega (0 para grátis).");
-    await upsertZone(ctx.user.id, ctx.restaurantId, { neighborhoodId: str(fd, "neighborhoodId"), feeCents: fee, etaMinutes: int(fd, "etaMinutes", 30), isActive: fd.has("isActive") ? bool(fd, "isActive") : true });
+    await upsertZone(ctx.user.id, ctx.restaurantId, { neighborhoodId: str(fd, "neighborhoodId"), feeCents: fee, etaMinutes: int(fd, "etaMinutes", 30), isActive: fd.has("hasActive") ? bool(fd, "isActive") : true });
     revalidatePath("/parceiro", "layout");
   }, "Zona de entrega guardada.");
 }

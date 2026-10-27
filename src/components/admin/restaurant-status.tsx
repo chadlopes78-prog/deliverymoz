@@ -12,3 +12,9 @@ export function CourierStatusBadge({ status }: { status: CourierStatus }) {
 export function UserStatusBadge({ status }: { status: UserStatus }) {
   return <Badge tone={{ ACTIVE: "green", SUSPENDED: "red", CLOSED: "neutral" }[status] as "green"}>{{ ACTIVE: "Ativa", SUSPENDED: "Suspensa", CLOSED: "Encerrada" }[status]}</Badge>;
 }
+
+/** Estado operacional: aprovado e a aceitar pedidos = ativo; aprovado sem aceitar pedidos = pausado. */
+export function RestaurantOperationalBadge({ status, acceptingOrders }: { status: RestaurantStatus; acceptingOrders: boolean }) {
+  if (status === "APPROVED") return <Badge tone={acceptingOrders ? "green" : "yellow"}>{acceptingOrders ? "Ativo" : "Pausado"}</Badge>;
+  return <RestaurantStatusBadge status={status} />;
+}

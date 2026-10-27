@@ -37,6 +37,7 @@ export default async function Zones() {
                   <details className="mt-2"><summary className="cursor-pointer text-sm font-semibold text-brand">Editar</summary>
                     <ActionForm action={zoneAction} className="mt-2 grid gap-2 sm:grid-cols-3">
                       <input type="hidden" name="neighborhoodId" value={z.neighborhoodId} />
+                      <input type="hidden" name="hasActive" value="1" />
                       <Input name="fee" inputMode="decimal" defaultValue={centsToInput(z.feeCents)} aria-label="Taxa" />
                       <Input name="etaMinutes" type="number" min={5} max={240} defaultValue={z.etaMinutes} aria-label="Tempo estimado" />
                       <Checkbox name="isActive" defaultChecked={z.isActive} label="Ativa" />
