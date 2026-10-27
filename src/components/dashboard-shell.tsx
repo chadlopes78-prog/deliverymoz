@@ -54,7 +54,7 @@ const THEME: Record<Variant, { aside: string; muted: string; idle: string; activ
 };
 
 /** Estrutura dos painéis: barra lateral fixa no computador e gaveta no telemóvel. */
-export function DashboardShell({ brand, title, subtitle, nav, children, logoutAction, topRight, bottomNav, variant = "courier", footerLinks = [], desktopHeader, collapsible = false }: {
+export function DashboardShell({ brand, title, subtitle, nav, children, logoutAction, topRight, bottomNav, variant = "courier", footerLinks = [], desktopHeader, collapsible = false, sidebarExtra }: {
   brand: React.ReactNode;
   title: string;
   subtitle?: string;
@@ -69,6 +69,8 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
   desktopHeader?: React.ReactNode;
   /** Permite recolher a barra lateral para ícones (preferência guardada neste navegador). */
   collapsible?: boolean;
+  /** Bloco adicional por baixo do cabeçalho da barra lateral (ex.: estado da loja). */
+  sidebarExtra?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -136,7 +138,7 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
         {compact ? (
           <div className={cn("grid place-items-center border-b py-4", t.border)}>{brand}</div>
         ) : (
-          <div className={cn("border-b px-4 py-4", t.border)}>{brand}<p className={cn("mt-2 truncate text-xs font-semibold uppercase tracking-wide", t.muted)}>{title}</p>{subtitle && <p className="truncate text-sm font-semibold">{subtitle}</p>}</div>
+          <div className={cn("border-b px-4 py-4", t.border)}>{brand}<p className={cn("mt-2 truncate text-xs font-semibold uppercase tracking-wide", t.muted)}>{title}</p>{subtitle && <p className="truncate text-sm font-semibold">{subtitle}</p>}{sidebarExtra && <div className="mt-3">{sidebarExtra}</div>}</div>
         )}
         <nav className={cn("flex-1 overflow-y-auto", compact ? "p-2" : "p-3")} aria-label={title}>{renderLinks(compact)}</nav>
         {compact ? (
@@ -168,7 +170,7 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
             <button className="absolute inset-0 bg-black/40 animate-fade-in" onClick={() => setOpen(false)} aria-label="Fechar menu" />
             <div className={cn("absolute inset-y-0 left-0 flex w-[84%] max-w-xs flex-col shadow-xl animate-slide-up pt-safe", t.aside)}>
               <div className={cn("flex items-start justify-between border-b px-4 py-4", t.border)}>
-                <div className="min-w-0">{brand}<p className="mt-2 truncate text-sm font-semibold">{subtitle ?? title}</p></div>
+                <div className="min-w-0">{brand}<p className="mt-2 truncate text-sm font-semibold">{subtitle ?? title}</p>{sidebarExtra && <div className="mt-3">{sidebarExtra}</div>}</div>
                 <button onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full hover:bg-ink/5" aria-label="Fechar"><X className="h-5 w-5" /></button>
               </div>
               <nav className="flex-1 overflow-y-auto p-3" aria-label={title}>{links}</nav>

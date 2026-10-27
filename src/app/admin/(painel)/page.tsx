@@ -2,6 +2,11 @@ import Link from "next/link";
 import { Receipt, Clock, CheckCircle2, XCircle, Users, Store, Bike, Wallet, Percent, TrendingUp, Hourglass, AlertTriangle, Download, Plus, Package, ChevronRight } from "lucide-react";
 import { platformActivity, platformTotals } from "@/server/services/activity";
 import { ActivityList } from "@/components/activity-list";
+import { DataTable } from "@/components/ui/data-table";
+import { OrderStatusBadge, formatDate } from "@/components/status";
+import { fileUrl } from "@/server/storage/files";
+import { db } from "@/server/db";
+
 import { requireAdmin } from "@/server/guards";
 import { platformOverview, dailySeries, topRestaurants, paymentMethodBreakdown, parseRange } from "@/server/services/finance";
 import { getSettings } from "@/server/services/settings";
@@ -21,7 +26,16 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const settings = await getSettings();
   const range = parseRange(sp);
   const canFinance = hasAdminPermission(user, "finance.view");
-  const [o, series, top, methods, t, activity] = await Promise.all([platformOverview(range), dailySeries(range), topRestaurants(range), paymentMethodBreakdown(range), platformTotals(), platformActivity({ take: 10 })]);
+  const [o, series, top, methods, t, activity, recentOrders, topItems] = await Promise.all([
+    platformOverview(range), dailySeries(range), topRestaurants(range), paymentMethodBreakdown(range), platformTotals(), platformActivity({ take: 10 }),
+    hasAdminPermission(user, "orders.view")
+      ? db.order.findMany({ where: { status: { not: "PENDING_PAYMENT" } }, orderBy: { createdAt: "desc" }, take: 8, include: { restaurant: { select: { name: true } }, _count: { select: { items: true } } } })
+      : Promise.resolve([]),
+    db.orderItem.groupBy({ by: ["productId"], where: { productId: { not: null }, order: { status: "DELIVERED", createdAt: { gte: range.from, lte: range.to } } }, _sum: { quantity: true }, orderBy: { _sum: { quantity: "desc" } }, take: 4 }),
+  ]);
+  const topProducts = topItems.length
+    ? await db.product.findMany({ where: { id: { in: topItems.map((i) => i.productId!) } }, select: { id: true, name: true, priceCents: true, imageFileId: true, restaurant: { select: { name: true } } } })
+    : [];
   const m = (v: number) => formatMoney(v, o.currency);
   return (
     <>
@@ -62,6 +76,28 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         </Card>
       </section>
 
+      {recentOrders.length > 0 && (
+        <Card className="mt-5">
+          <CardHeader title="Pedidos recentes" description="Últimos pedidos registados na plataforma." action={<Link href="/admin/pedidos" className="text-sm font-semibold text-brand">Ver todos</Link>} />
+          <CardBody className="p-0 sm:p-0">
+            <DataTable
+              rows={recentOrders}
+              rowKey={(r) => r.id}
+              rowHref={(r) => `/admin/pedidos/${r.id}`}
+              columns={[
+                { key: "c", header: "Pedido", cell: (r) => <span className="font-mono">#{r.code}</span> },
+                { key: "r", header: "Restaurante", cell: (r) => r.restaurant.name },
+                { key: "n", header: "Cliente", cell: (r) => r.customerName, hideOnMobile: true },
+                { key: "d", header: "Data", cell: (r) => formatDate(r.createdAt), hideOnMobile: true },
+                { key: "i", header: "Itens", cell: (r) => r._count.items, hideOnMobile: true },
+                { key: "v", header: "Valor", cell: (r) => <span className="tabular-nums">{formatMoney(r.totalCents, r.currency)}</span> },
+                { key: "s", header: "Estado", cell: (r) => <OrderStatusBadge status={r.status} /> },
+              ]}
+            />
+          </CardBody>
+        </Card>
+      )}
+
       <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted">Desempenho por período</h2>
       <PeriodTabs current={range.key} base="/admin" />
 
@@ -88,6 +124,28 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         {canFinance && <Card><CardHeader title="Volume de vendas" /><CardBody><BarChart data={series.map((d) => ({ label: d.day, value: d.grossCents }))} format={m} /></CardBody></Card>}
         {canFinance && <Card><CardHeader title="Evolução das comissões" /><CardBody><BarChart data={series.map((d) => ({ label: d.day, value: d.commissionCents }))} format={m} color="var(--accent)" /></CardBody></Card>}
         <Card><CardHeader title="Cancelamentos por dia" /><CardBody><BarChart data={series.map((d) => ({ label: d.day, value: d.cancelled }))} color="#dc2626" /></CardBody></Card>
+        <Card>
+          <CardHeader title="Pratos mais vendidos" description="Pedidos entregues no período." />
+          <CardBody>
+            {topProducts.length === 0 ? <p className="py-8 text-center text-sm text-muted">Ainda não existem dados neste período.</p> : (
+              <ul className="grid grid-cols-2 gap-3">
+                {topItems.map((ti) => {
+                  const p = topProducts.find((x) => x.id === ti.productId);
+                  if (!p) return null;
+                  return (
+                    <li key={p.id} className="overflow-hidden rounded-xl border border-line">
+                      <div className="aspect-[4/3] bg-ink/5">{p.imageFileId ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={fileUrl(p.imageFileId)!} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      ) : null}</div>
+                      <div className="p-2 text-xs"><p className="truncate text-sm font-semibold">{p.name}</p><p className="truncate text-muted">{p.restaurant.name}</p><p className="mt-1 flex justify-between"><span>{ti._sum.quantity} vendidos</span><span className="font-semibold tabular-nums">{formatMoney(p.priceCents)}</span></p></div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
         <Card><CardHeader title="Restaurantes com mais pedidos" /><CardBody><HBarList data={top.map((t) => ({ label: t.name, value: t.orders }))} /></CardBody></Card>
         <Card><CardHeader title="Métodos de pagamento" /><CardBody><HBarList data={methods.map((x) => ({ label: PAYMENT_METHOD_LABEL[x.method], value: x.orders }))} /></CardBody></Card>
       </section>

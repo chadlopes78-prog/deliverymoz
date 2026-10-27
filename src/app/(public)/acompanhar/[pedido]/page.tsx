@@ -33,6 +33,16 @@ const STEPS: { status: OrderStatus[]; label: string }[] = [
   { status: ["PICKED_UP", "IN_TRANSIT"], label: "A caminho" },
   { status: ["DELIVERED"], label: "Entregue" },
 ];
+/** Frase curta sobre o que está a acontecer agora (só a partir do estado real do pedido). */
+const STATUS_HINT: Partial<Record<OrderStatus, string>> = {
+  PLACED: "O restaurante está a analisar o seu pedido.",
+  ACCEPTED: "O restaurante confirmou o seu pedido.",
+  PREPARING: "O seu pedido está a ser preparado.",
+  READY_FOR_PICKUP: "O pedido está pronto e aguarda recolha.",
+  PICKED_UP: "O pedido foi recolhido e vai a caminho.",
+  IN_TRANSIT: "O pedido está a caminho da sua morada.",
+  DELIVERED: "Pedido entregue. Bom apetite!",
+};
 const ORDER: OrderStatus[] = ["PENDING_PAYMENT", "PLACED", "ACCEPTED", "PREPARING", "READY_FOR_PICKUP", "PICKED_UP", "IN_TRANSIT", "DELIVERED"];
 
 export default async function TrackPage({ params, searchParams }: { params: Promise<{ pedido: string }>; searchParams: Promise<{ novo?: string }> }) {
@@ -84,22 +94,26 @@ export default async function TrackPage({ params, searchParams }: { params: Prom
       )}
 
       {!["CANCELLED", "REJECTED", "PENDING_PAYMENT"].includes(order.status) && (
-        <ol className="mt-6 grid grid-cols-6 gap-1" aria-label="Progresso do pedido">
-          {STEPS.map((s, i) => {
-            const stepIdx = Math.max(...s.status.map((x) => ORDER.indexOf(x)));
-            const minIdx = Math.min(...s.status.map((x) => ORDER.indexOf(x)));
-            const done = idx >= minIdx;
-            const current = s.status.includes(order.status);
-            return (
-              <li key={s.label} className="flex flex-col items-center text-center" aria-current={current ? "step" : undefined}>
-                <span className={cn("grid h-8 w-8 place-items-center rounded-full text-xs font-bold", done ? "bg-brand text-brand-contrast" : "bg-ink/10 text-muted", current && "ring-4 ring-brand/20")}>
-                  {done && idx > stepIdx ? <Check className="h-4 w-4" /> : i + 1}
-                </span>
-                <span className={cn("mt-1 text-[10px] leading-tight sm:text-xs", done ? "font-semibold" : "text-muted")}>{s.label}</span>
-              </li>
-            );
-          })}
-        </ol>
+        <section className="mt-5 rounded-2xl border border-line bg-surface p-4 sm:p-5" aria-labelledby="progress-title">
+          <p id="progress-title" className="text-sm font-semibold">{STATUS_HINT[order.status] ?? ORDER_STATUS_LABEL[order.status]}</p>
+          <ol className="mt-3 grid grid-cols-6 gap-1.5" aria-label="Progresso do pedido">
+            {STEPS.map((s, i) => {
+              const stepIdx = Math.max(...s.status.map((x) => ORDER.indexOf(x)));
+              const minIdx = Math.min(...s.status.map((x) => ORDER.indexOf(x)));
+              const done = idx >= minIdx;
+              const current = s.status.includes(order.status);
+              return (
+                <li key={s.label} className="min-w-0" aria-current={current ? "step" : undefined}>
+                  <span className={cn("block h-1.5 rounded-full", done ? "bg-brand" : "bg-ink/10", current && !ended && "animate-pulse")} />
+                  <span className={cn("mt-1.5 flex items-center gap-0.5 text-[10px] leading-tight sm:text-xs", done ? "font-semibold" : "text-muted")}>
+                    {done && idx > stepIdx && <Check className="hidden h-3 w-3 shrink-0 text-brand sm:inline" aria-hidden />}
+                    <span className="sr-only">Passo {i + 1}: </span>{s.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
       )}
       {order.estimatedReadyAt && ["ACCEPTED", "PREPARING"].includes(order.status) && (
         <p className="mt-3 text-center text-sm text-muted">Previsão de conclusão da preparação: <strong>{formatDate(order.estimatedReadyAt, { timeStyle: "short" }, settings.timezone)}</strong></p>
@@ -128,7 +142,7 @@ export default async function TrackPage({ params, searchParams }: { params: Prom
       )}
 
       <section className="mt-5 rounded-2xl border border-line bg-surface p-4 text-sm">
-        <h2 className="mb-3 font-semibold">Itens</h2>
+        <h2 className="mb-3 font-semibold">Detalhes do pedido</h2>
         <ul className="space-y-2">
           {order.items.map((it) => (
             <li key={it.id} className="flex justify-between gap-3">
@@ -152,7 +166,7 @@ export default async function TrackPage({ params, searchParams }: { params: Prom
 
       <section className="mt-5 grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-line bg-surface p-4 text-sm">
-          <h2 className="mb-1 flex items-center gap-2 font-semibold"><MapPin className="h-4 w-4" /> Entrega</h2>
+          <h2 className="mb-1 flex items-center gap-2 font-semibold"><MapPin className="h-4 w-4" /> Morada de entrega</h2>
           <p>{order.street}, {order.neighborhoodName}, {order.cityName}</p>
           {order.addressReference && <p className="text-muted">Ref.: {order.addressReference}</p>}
         </div>

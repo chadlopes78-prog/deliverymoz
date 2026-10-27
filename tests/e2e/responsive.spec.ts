@@ -7,11 +7,11 @@ import fs from "node:fs";
  */
 const VIEWPORTS = [
   { name: "android-pequeno", width: 320, height: 568 },
-  { name: "android-grande", width: 412, height: 915 },
-  { name: "iphone-se", width: 375, height: 667 },
-  { name: "iphone-pro-max", width: 430, height: 932 },
-  { name: "tablet", width: 768, height: 1024 },
-  { name: "portatil", width: 1366, height: 768 },
+  { name: "telemovel-360", width: 360, height: 780 },
+  { name: "telemovel-390", width: 390, height: 844 },
+  { name: "tablet-768", width: 768, height: 1024 },
+  { name: "tablet-1024", width: 1024, height: 768 },
+  { name: "portatil-1440", width: 1440, height: 900 },
   { name: "monitor", width: 1920, height: 1080 },
 ];
 
@@ -20,7 +20,7 @@ const shotsDir = "test-results/screens";
 
 const PUBLIC = ["/", "/restaurantes", "/entrar", "/registar", "/ajuda", "/termos", "/parceiro/registo", "/entregador/registo", "/sacola", "/admin/login", "/entrar/comprador", "/entrar/parceiro"];
 const CUSTOMER = ["/minha-conta", "/minha-conta/pedidos", "/minha-conta/enderecos", "/minha-conta/seguranca"];
-const OWNER = ["/admin", "/admin/compradores", "/admin/parceiros", "/admin/utilizadores", "/admin/atividade", "/admin/administradores", "/admin/pedidos", "/admin/restaurantes", "/admin/restaurantes/novo", "/admin/produtos", "/admin/produtos/novo", "/admin/categorias", "/admin/aprovacoes", "/admin/vendas", "/admin/transacoes", "/admin/banners", "/admin/reclamacoes", "/admin/financeiro", "/admin/configuracoes?tab=pagamentos", "/admin/cupons", "/parceiro", "/parceiro/pedidos?tab=historico", "/parceiro/cardapio", "/parceiro/horarios", "/parceiro/loja"];
+const OWNER = ["/admin", "/admin/compradores", "/admin/parceiros", "/admin/utilizadores", "/admin/atividade", "/admin/administradores", "/admin/pedidos", "/admin/restaurantes", "/admin/restaurantes/novo", "/admin/produtos", "/admin/produtos/novo", "/admin/categorias", "/admin/aprovacoes", "/admin/vendas", "/admin/transacoes", "/admin/banners", "/admin/reclamacoes", "/admin/financeiro", "/admin/configuracoes?tab=pagamentos", "/admin/cupons", "/parceiro", "/parceiro/pedidos", "/parceiro/pedidos?tab=historico", "/admin/notificacoes", "/admin/pesquisa?q=a", "/parceiro/cardapio", "/parceiro/horarios", "/parceiro/loja"];
 
 /** Ficha e edição do restaurante criado no fluxo completo. */
 function restaurantPages() {
@@ -71,7 +71,7 @@ for (const vp of VIEWPORTS) {
         await page.goto(path);
         await page.waitForLoadState("networkidle");
         await checkNoOverflow(page, `${vp.name} ${path}`);
-        if (["/", "/admin", "/parceiro/pedidos?tab=historico", "/parceiro", "/minha-conta"].includes(path) && (vp.width === 375 || vp.width === 1366)) {
+        if (["/", "/admin", "/parceiro/pedidos", "/parceiro/pedidos?tab=historico", "/admin/notificacoes", "/admin/pesquisa?q=a", "/parceiro", "/minha-conta"].includes(path) && (vp.width === 390 || vp.width === 1440)) {
           await page.screenshot({ path: `${shotsDir}/${vp.name}${path.replace(/[/?=]/g, "_") || "_home"}.png`, fullPage: true });
         }
       }
@@ -88,13 +88,13 @@ for (const vp of VIEWPORTS) {
           const box = await page.getByRole("dialog").boundingBox();
           expect(box!.width).toBeLessThanOrEqual(vp.width + 1);
           expect(box!.height).toBeLessThanOrEqual(vp.height + 1);
-          if (vp.width === 375) await page.screenshot({ path: `${shotsDir}/${vp.name}_produto.png` });
+          if (vp.width === 390) await page.screenshot({ path: `${shotsDir}/${vp.name}_produto.png` });
           await page.getByRole("button", { name: /Adicionar ·/ }).click();
           await expect(page.getByRole("dialog")).toHaveCount(0);
           await page.goto("/checkout");
           await page.waitForLoadState("networkidle");
           await checkNoOverflow(page, `${vp.name} checkout`);
-          if (vp.width === 375) await page.screenshot({ path: `${shotsDir}/${vp.name}_checkout.png`, fullPage: true });
+          if (vp.width === 390) await page.screenshot({ path: `${shotsDir}/${vp.name}_checkout.png`, fullPage: true });
           await page.goto("/sacola");
           await page.getByRole("button", { name: "Esvaziar" }).click({ trial: false }).catch(() => undefined);
         }

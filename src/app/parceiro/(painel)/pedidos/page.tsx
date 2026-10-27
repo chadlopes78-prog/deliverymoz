@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { OrderStatus, Prisma } from "@prisma/client";
 import { Receipt, Phone, MapPin, Bike } from "lucide-react";
 import { requirePartner } from "@/server/guards";
@@ -27,102 +28,152 @@ export const metadata = { title: "Pedidos" };
 
 const ACTIVE: OrderStatus[] = ["PLACED", "ACCEPTED", "PREPARING", "READY_FOR_PICKUP", "PICKED_UP", "IN_TRANSIT"];
 
+const TABS = [
+  { key: "novos", label: "Novos", statuses: ["PLACED"] as OrderStatus[] },
+  { key: "preparacao", label: "Em preparação", statuses: ["ACCEPTED", "PREPARING"] as OrderStatus[] },
+  { key: "prontos", label: "Prontos", statuses: ["READY_FOR_PICKUP"] as OrderStatus[] },
+  { key: "entrega", label: "Em entrega", statuses: ["PICKED_UP", "IN_TRANSIT"] as OrderStatus[] },
+];
+
+type ActiveOrder = Prisma.OrderGetPayload<{ include: { items: true; delivery: { include: { courier: { include: { user: { select: { name: true; phone: true } } } } } } } }>;
+
 export default async function PartnerOrders({ searchParams }: { searchParams: Promise<{ tab?: string; pedido?: string; q?: string; estado?: string; pagina?: string; de?: string; ate?: string }> }) {
   const sp = await searchParams;
   const ctx = await requirePartner("orders.manage");
   const settings = await getSettings();
-  const tab = sp.tab ?? "ativos";
-  if (tab === "historico") return <History ctx={ctx} sp={sp} tz={settings.timezone} />;
+  if (sp.tab === "historico") return <History ctx={ctx} sp={sp} tz={settings.timezone} />;
 
-  const orders = await db.order.findMany({
+  const orders: ActiveOrder[] = await db.order.findMany({
     where: { restaurantId: ctx.restaurantId, status: { in: ACTIVE } },
     orderBy: { createdAt: "asc" },
     include: { items: true, delivery: { include: { courier: { include: { user: { select: { name: true, phone: true } } } } } } },
   });
-  const columns: { title: string; statuses: OrderStatus[] }[] = [
-    { title: "Novos", statuses: ["PLACED"] },
-    { title: "Em preparação", statuses: ["ACCEPTED", "PREPARING"] },
-    { title: "Prontos", statuses: ["READY_FOR_PICKUP"] },
-    { title: "Em entrega", statuses: ["PICKED_UP", "IN_TRANSIT"] },
-  ];
+  // O pedido selecionado define o separador (continua visível quando muda de estado)
+  const selected = orders.find((o) => o.id === sp.pedido) ?? null;
+  const tab = TABS.find((t) => (selected ? t.statuses.includes(selected.status) : t.key === sp.tab)) ?? TABS.find((t) => orders.some((o) => t.statuses.includes(o.status))) ?? TABS[0];
+  const q = sp.q?.trim().replace("#", "").toUpperCase();
+  const list = orders.filter((o) => tab.statuses.includes(o.status) && (!q || o.code.includes(q) || o.customerName.toUpperCase().includes(q)));
+  const current = selected ?? list[0] ?? null;
+  const tabHref = (key: string) => `/parceiro/pedidos?tab=${key}`;
   return (
     <>
       <AutoRefresh seconds={10} />
       <PageHeader title="Pedidos" description="Atualização automática a cada 10 segundos." actions={<NewOrderAlert placedIds={orders.filter((o) => o.status === "PLACED").map((o) => o.id)} />} />
-      <Tabs base="/parceiro/pedidos" current={tab} tabs={[["ativos", `Em curso (${orders.length})`], ["historico", "Histórico"]]} />
-      {orders.length === 0 ? <EmptyState icon={Receipt} title="Sem pedidos em curso" description="Os novos pedidos aparecem aqui automaticamente." /> : (
-        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-          {columns.map((col) => {
-            const list = orders.filter((o) => col.statuses.includes(o.status));
-            return (
-              <section key={col.title} aria-label={col.title}>
-                <h2 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">{col.title} <Badge tone={col.title === "Novos" && list.length ? "brand" : "neutral"}>{list.length}</Badge></h2>
-                <ul className="space-y-3">
-                  {list.map((o) => (
-                    <li key={o.id} id={o.id} className={cn("rounded-2xl border bg-surface p-4 text-sm", o.status === "PLACED" ? "border-brand shadow-[0_0_0_3px] shadow-brand/15" : "border-line", sp.pedido === o.id && "ring-2 ring-accent")}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div><p className="font-mono text-base font-bold">#{o.code}</p><p className="text-xs text-muted">{formatDate(o.createdAt, { timeStyle: "short" }, settings.timezone)} · {o.customerName}</p></div>
-                        <OrderStatusBadge status={o.status} />
-                      </div>
-                      <ul className="mt-3 space-y-1 border-y border-line py-2">
-                        {o.items.map((it) => (
-                          <li key={it.id}><span className="font-semibold">{it.quantity}×</span> {it.productName}
-                            {Array.isArray(it.options) && (it.options as { name: string }[]).length > 0 && <span className="block pl-5 text-xs text-muted">{(it.options as { name: string }[]).map((x) => x.name).join(", ")}</span>}
-                            {it.notes && <span className="block pl-5 text-xs font-semibold text-amber-700">“{it.notes}”</span>}
-                          </li>
-                        ))}
-                      </ul>
-                      {o.notesForRestaurant && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Nota: {o.notesForRestaurant}</p>}
-                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-bold">{formatMoney(o.totalCents, o.currency)}</span>
-                        <span className="flex items-center gap-1 text-xs text-muted">{PAYMENT_METHOD_LABEL[o.paymentMethod]} <PaymentStatusBadge status={o.paymentStatus} /></span>
-                      </div>
-                      {o.deliveryMode === "RESTAURANT" && o.status !== "PLACED" && (
-                        <div className="mt-2 space-y-0.5 text-xs">
-                          <p className="flex items-start gap-1"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />{o.street}, {o.neighborhoodName}{o.addressReference ? ` — ${o.addressReference}` : ""}</p>
-                          <p className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /><a href={`tel:+${o.customerPhone}`} className="text-brand">{formatPhone(o.customerPhone)}</a></p>
-                          {o.notesForDelivery && <p className="text-muted">Entrega: {o.notesForDelivery}</p>}
-                        </div>
-                      )}
-                      {o.deliveryMode === "PLATFORM" && o.delivery && (
-                        <p className="mt-2 flex items-center gap-1 text-xs"><Bike className="h-3.5 w-3.5" /> {DELIVERY_STATUS_LABEL[o.delivery.status]}{o.delivery.courier ? `: ${o.delivery.courier.user.name}` : ""}</p>
-                      )}
-                      {o.estimatedReadyAt && ["ACCEPTED", "PREPARING"].includes(o.status) && <p className="mt-1 text-xs text-muted">Pronto previsto: {formatDate(o.estimatedReadyAt, { timeStyle: "short" }, settings.timezone)}</p>}
+      <nav className="scrollbar-none -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" aria-label="Estados dos pedidos">
+        {TABS.map((t) => {
+          const n = orders.filter((o) => t.statuses.includes(o.status)).length;
+          const active = t.key === tab.key;
+          return (
+            <Link key={t.key} href={tabHref(t.key)} aria-current={active ? "page" : undefined} className={cn("flex min-h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-semibold", active ? "border-accent bg-accent text-white" : "border-line bg-surface hover:border-accent")}>
+              {t.label}<span className={cn("grid h-5 min-w-5 place-items-center rounded-full px-1 text-xs", active ? "bg-white/25" : t.key === "novos" && n ? "bg-brand text-brand-contrast" : "bg-ink/10")}>{n}</span>
+            </Link>
+          );
+        })}
+        <Link href={tabHref("historico")} className="flex min-h-10 shrink-0 items-center rounded-xl border border-line bg-surface px-3 text-sm font-semibold hover:border-accent">Histórico</Link>
+      </nav>
+      <div className="grid gap-4 lg:grid-cols-[340px_1fr] [&>*]:min-w-0">
+        <section aria-label={`Pedidos: ${tab.label}`} className={cn("rounded-[var(--radius-card)] border border-line bg-surface", sp.pedido && current && "hidden lg:block")}>
+          <form action="/parceiro/pedidos" className="border-b border-line p-3" role="search">
+            <input type="hidden" name="tab" value={tab.key} />
+            <input name="q" defaultValue={sp.q ?? ""} type="search" placeholder="Código ou cliente" aria-label="Pesquisar pedidos" className="h-10 w-full rounded-xl border border-line bg-bg px-3 text-sm" />
+          </form>
+          {list.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted">{q ? "Nenhum pedido encontrado." : `Sem pedidos ${tab.label.toLowerCase()}.`}</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {list.map((o) => (
+                <li key={o.id}>
+                  <Link href={`/parceiro/pedidos?tab=${tab.key}&pedido=${o.id}`} aria-current={current?.id === o.id ? "true" : undefined} className={cn("flex items-start justify-between gap-3 p-3 hover:bg-ink/[0.03]", current?.id === o.id && "bg-accent/5 shadow-[inset_3px_0_0] shadow-accent")}>
+                    <span className="min-w-0">
+                      <span className="block font-mono font-bold">#{o.code}</span>
+                      <span className="block truncate text-xs text-muted">{o.customerName} · {o.items.reduce((n, i) => n + i.quantity, 0)} itens · {formatMoney(o.totalCents, o.currency)}</span>
+                      <span className="block text-xs text-muted">{o.deliveryMode === "RESTAURANT" ? "Entrega própria" : "Entregador da plataforma"} · {o.neighborhoodName}</span>
+                    </span>
+                    <span className="shrink-0 text-right text-xs text-muted">{formatDate(o.createdAt, { timeStyle: "short" }, settings.timezone)}{o.status === "PLACED" && <Badge tone="brand" className="mt-1 block">Novo</Badge>}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section aria-label="Detalhe do pedido" className={cn(!sp.pedido && "hidden lg:block")}>
+          {current ? (
+            <>
+              {sp.pedido && <Link href={tabHref(tab.key)} className="mb-3 inline-block text-sm font-semibold text-accent lg:hidden">← Voltar à lista</Link>}
+              <OrderDetail o={current} tz={settings.timezone} />
+            </>
+          ) : (
+            <EmptyState icon={Receipt} title="Sem pedidos em curso" description="Os novos pedidos aparecem aqui automaticamente, com alerta sonoro." />
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
 
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {o.status === "PLACED" && (
-                          <>
-                            <ActionForm action={orderTransitionAction} className="flex gap-2">
-                              <input type="hidden" name="id" value={o.id} /><input type="hidden" name="to" value="ACCEPTED" />
-                              <Select name="prepTimeMinutes" defaultValue="30" className="h-9 w-24" aria-label="Tempo de preparação">{[10, 15, 20, 30, 40, 50, 60, 90].map((m) => <option key={m} value={m}>{m} min</option>)}</Select>
-                              <SubmitButton size="sm" variant="accent">Aceitar</SubmitButton>
-                            </ActionForm>
-                            <ReasonForm action={orderTransitionAction} hidden={{ id: o.id, to: "REJECTED" }} label="Recusar" variant="danger" placeholder="Motivo (ex.: produto esgotado)" />
-                          </>
-                        )}
-                        {o.status === "ACCEPTED" && <QuickAction action={orderTransitionAction} hidden={{ id: o.id, to: "PREPARING" }} label="Iniciar preparação" />}
-                        {(o.status === "ACCEPTED" || o.status === "PREPARING") && <QuickAction action={orderTransitionAction} hidden={{ id: o.id, to: "READY_FOR_PICKUP" }} label="Marcar pronto" variant="accent" />}
-                        {o.deliveryMode === "RESTAURANT" && o.status === "READY_FOR_PICKUP" && <QuickAction action={orderTransitionAction} hidden={{ id: o.id, to: "PICKED_UP" }} label="Saiu para entrega" variant="accent" />}
-                        {o.deliveryMode === "RESTAURANT" && o.status === "PICKED_UP" && <QuickAction action={orderTransitionAction} hidden={{ id: o.id, to: "IN_TRANSIT" }} label="A caminho" />}
-                        {o.deliveryMode === "RESTAURANT" && (o.status === "PICKED_UP" || o.status === "IN_TRANSIT") && (
-                          <ActionForm action={orderTransitionAction} className="flex flex-wrap items-center gap-2">
-                            <input type="hidden" name="id" value={o.id} /><input type="hidden" name="to" value="DELIVERED" />
-                            {o.paymentMethod === "CASH_ON_DELIVERY" && <Checkbox name="cashCollected" required label={`Recebi ${formatMoney(o.totalCents, o.currency)}`} />}
-                            <SubmitButton size="sm" variant="accent">Entregue</SubmitButton>
-                          </ActionForm>
-                        )}
-                        {(o.status === "ACCEPTED" || o.status === "PREPARING") && <ReasonForm action={orderTransitionAction} hidden={{ id: o.id, to: "CANCELLED" }} label="Cancelar" variant="danger" confirmMessage="Cancelar este pedido? O cliente será notificado." />}
-                      </div>
-                    </li>
-                  ))}
-                  {list.length === 0 && <li className="rounded-2xl border border-dashed border-line p-4 text-center text-xs text-muted">Nenhum</li>}
-                </ul>
-              </section>
-            );
-          })}
+/** Detalhe e ações de um pedido (as transições são validadas no servidor). */
+function OrderDetail({ o, tz }: { o: ActiveOrder; tz: string }) {
+  return (
+    <article className={cn("rounded-[var(--radius-card)] border bg-surface text-sm", o.status === "PLACED" ? "border-brand shadow-[0_0_0_3px] shadow-brand/15" : "border-line")}>
+      <header className="flex flex-wrap items-start justify-between gap-2 border-b border-line p-4">
+        <div>
+          <p className="font-mono text-lg font-bold">#{o.code}</p>
+          <p className="text-xs text-muted">{formatDate(o.createdAt, undefined, tz)} · {o.customerName}</p>
+        </div>
+        <OrderStatusBadge status={o.status} />
+      </header>
+      <ul className="divide-y divide-line px-4">
+        {o.items.map((it) => (
+          <li key={it.id} className="flex justify-between gap-3 py-2.5">
+            <span><span className="font-semibold">{it.quantity}×</span> {it.productName}
+              {Array.isArray(it.options) && (it.options as { name: string }[]).length > 0 && <span className="block pl-5 text-xs text-muted">{(it.options as { name: string }[]).map((x) => x.name).join(", ")}</span>}
+              {it.notes && <span className="block pl-5 text-xs font-semibold text-amber-700">“{it.notes}”</span>}
+            </span>
+            <span className="shrink-0 tabular-nums">{formatMoney(it.totalCents, o.currency)}</span>
+          </li>
+        ))}
+      </ul>
+      {o.notesForRestaurant && <p className="mx-4 mb-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Nota do cliente: {o.notesForRestaurant}</p>}
+      <dl className="grid grid-cols-2 gap-3 border-y border-line bg-ink/[0.02] p-4 text-xs sm:grid-cols-4">
+        <div><dt className="text-muted">Pagamento</dt><dd className="mt-0.5 flex flex-wrap items-center gap-1 font-semibold">{PAYMENT_METHOD_LABEL[o.paymentMethod]} <PaymentStatusBadge status={o.paymentStatus} /></dd></div>
+        <div><dt className="text-muted">Entrega</dt><dd className="mt-0.5 font-semibold">{o.deliveryMode === "PLATFORM" && o.delivery ? `${DELIVERY_STATUS_LABEL[o.delivery.status]}${o.delivery.courier ? `: ${o.delivery.courier.user.name}` : ""}` : "Pelo restaurante"}</dd></div>
+        <div><dt className="text-muted">Pronto previsto</dt><dd className="mt-0.5 font-semibold">{o.estimatedReadyAt ? formatDate(o.estimatedReadyAt, { timeStyle: "short" }, tz) : "—"}</dd></div>
+        <div><dt className="text-muted">Total</dt><dd className="mt-0.5 text-base font-bold">{formatMoney(o.totalCents, o.currency)}</dd></div>
+      </dl>
+      {o.deliveryMode === "RESTAURANT" && o.status !== "PLACED" && (
+        <div className="space-y-1 px-4 pt-3 text-xs">
+          <p className="flex items-start gap-1"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />{o.street}, {o.neighborhoodName}{o.addressReference ? ` — ${o.addressReference}` : ""}</p>
+          <p className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /><a href={`tel:+${o.customerPhone}`} className="text-brand">{formatPhone(o.customerPhone)}</a></p>
+          {o.notesForDelivery && <p className="text-muted">Entrega: {o.notesForDelivery}</p>}
         </div>
       )}
-    </>
+      {o.deliveryMode === "PLATFORM" && o.delivery?.courier && <p className="flex items-center gap-1 px-4 pt-3 text-xs"><Bike className="h-3.5 w-3.5" /> Entregador: {o.delivery.courier.user.name}</p>}
+      <div className="flex flex-wrap gap-2 p-4">
+        {o.status === "PLACED" && (
+          <>
+            <ActionForm action={orderTransitionAction} className="flex gap-2">
+              <input type="hidden" name="id" value={o.id} /><input type="hidden" name="to" value="ACCEPTED" />
+              <Select name="prepTimeMinutes" defaultValue="30" className="h-10 w-24" aria-label="Tempo de preparação">{[10, 15, 20, 30, 40, 50, 60, 90].map((m) => <option key={m} value={m}>{m} min</option>)}</Select>
+              <SubmitButton variant="accent">Aceitar</SubmitButton>
+            </ActionForm>
+            <ReasonForm action={orderTransitionAction} hidden={{ id: o.id, to: "REJECTED" }} label="Recusar" variant="danger" placeholder="Motivo (ex.: produto esgotado)" />
+          </>
+        )}
+        {o.status === "ACCEPTED" && <QuickAction action={orderTransitionAction} hidden={{ id: o.id, to: "PREPARING" }} label="Iniciar preparação" size="md" />}
+        {(o.status === "ACCEPTED" || o.status === "PREPARING") && <QuickAction action={orderTransitionAction} hidden={{ id: o.id, to: "READY_FOR_PICKUP" }} label="Marcar pronto" variant="accent" size="md" />}
+        {o.deliveryMode === "RESTAURANT" && o.status === "READY_FOR_PICKUP" && <QuickAction action={orderTransitionAction} hidden={{ id: o.id, to: "PICKED_UP" }} label="Saiu para entrega" variant="accent" size="md" />}
+        {o.deliveryMode === "RESTAURANT" && o.status === "PICKED_UP" && <QuickAction action={orderTransitionAction} hidden={{ id: o.id, to: "IN_TRANSIT" }} label="A caminho" size="md" />}
+        {o.deliveryMode === "RESTAURANT" && (o.status === "PICKED_UP" || o.status === "IN_TRANSIT") && (
+          <ActionForm action={orderTransitionAction} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="id" value={o.id} /><input type="hidden" name="to" value="DELIVERED" />
+            {o.paymentMethod === "CASH_ON_DELIVERY" && <Checkbox name="cashCollected" required label={`Recebi ${formatMoney(o.totalCents, o.currency)}`} />}
+            <SubmitButton variant="accent">Entregue</SubmitButton>
+          </ActionForm>
+        )}
+        {o.deliveryMode === "PLATFORM" && o.status === "READY_FOR_PICKUP" && <p className="text-xs text-muted">A aguardar recolha pelo entregador da plataforma.</p>}
+        {(o.status === "ACCEPTED" || o.status === "PREPARING") && <ReasonForm action={orderTransitionAction} hidden={{ id: o.id, to: "CANCELLED" }} label="Cancelar" variant="danger" confirmMessage="Cancelar este pedido? O cliente será notificado." />}
+      </div>
+    </article>
   );
 }
 

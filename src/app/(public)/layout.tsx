@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShoppingBag, Search, User, Bell } from "lucide-react";
+import { ShoppingBag, Search, User, Bell, Receipt } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { LocationButton } from "@/components/public/location-button";
 import { BottomNav } from "@/components/public/bottom-nav";
@@ -21,7 +21,7 @@ export default async function PublicLayout({ children }: { children: React.React
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3">
           <span className="sm:hidden"><Logo compact /></span>
           <span className="hidden sm:block"><Logo /></span>
-          <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Principal">
+          <nav className="ml-4 hidden items-center gap-1 xl:flex" aria-label="Principal">
             {[["/", "Início"], ["/restaurantes", "Explorar restaurantes"], ...(user ? [] : [["/#como-funciona", "Como funciona"]]), [user?.restaurantMembers.length ? "/parceiro" : "/#parceiros", "Para restaurantes"]].map(([href, label]) => (
               <Link key={label} href={href} className="rounded-full px-3 py-2 text-sm font-semibold text-ink/75 hover:bg-ink/5 hover:text-ink">{label}</Link>
             ))}
@@ -29,14 +29,19 @@ export default async function PublicLayout({ children }: { children: React.React
           <div className="min-w-0 flex-1 md:ml-auto md:max-w-xs md:flex-none">
             <LocationButton geography={geography} location={location} />
           </div>
+          <form action="/restaurantes" role="search" className="relative hidden w-56 shrink-0 2xl:block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
+            <input name="q" type="search" maxLength={80} placeholder="Pratos ou restaurantes" aria-label="Pesquisar pratos ou restaurantes" className="h-10 w-full rounded-full border border-line bg-bg pl-9 pr-3 text-sm outline-none focus:border-brand" />
+          </form>
           <nav className="flex shrink-0 items-center gap-1" aria-label="Conta">
-            <Link href="/restaurantes" className="hidden h-10 w-10 place-items-center rounded-full hover:bg-ink/5 md:grid" aria-label="Pesquisar"><Search className="h-5 w-5" /></Link>
+            <Link href="/restaurantes" className="hidden h-10 w-10 place-items-center rounded-full hover:bg-ink/5 md:grid 2xl:hidden" aria-label="Pesquisar"><Search className="h-5 w-5" /></Link>
             {user ? (
               <>
                 <Link href="/minha-conta/notificacoes" className="relative grid h-10 w-10 place-items-center rounded-full hover:bg-ink/5" aria-label={`Notificações${unread ? ` (${unread} por ler)` : ""}`}>
                   <Bell className="h-5 w-5" />
                   {unread > 0 && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-surface" />}
                 </Link>
+                <Link href="/minha-conta/pedidos" className="hidden items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold hover:bg-ink/5 lg:flex"><Receipt className="h-5 w-5" /> Pedidos</Link>
                 {isAdminUser(user) && <Link href="/admin" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 xl:block">Centro de controlo</Link>}
                 {user.restaurantMembers.length > 0 && <Link href="/parceiro" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 xl:block">Meu restaurante</Link>}
                 {user.courier && <Link href="/entregador" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 xl:block">Entregas</Link>}

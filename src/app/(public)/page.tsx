@@ -27,6 +27,10 @@ export default async function HomePage() {
   const featured = all.filter((r) => r.isFeatured);
   const promos = all.filter((r) => r.hasPromo);
   const fast = all.filter((r) => r.availability.orderable).sort((a, b) => a.etaMinutes - b.etaMinutes).slice(0, 12);
+  // Só avaliações reais (pelo menos 3) e restaurantes realmente aprovados nos últimos 30 dias.
+  const topRated = all.filter((r) => r.ratingCount >= 3).sort((a, b) => b.ratingAvg - a.ratingAvg).slice(0, 12);
+  const monthAgo = Date.now() - 30 * 86_400_000;
+  const newest = all.filter((r) => r.listedSince.getTime() >= monthAgo).sort((a, b) => b.listedSince.getTime() - a.listedSince.getTime()).slice(0, 12);
   const reorder = reorderIds.map((id) => all.find((r) => r.id === id)).filter((r): r is RestaurantListItem => !!r);
   const firstName = user?.name.split(" ")[0];
   const activateOwner = user ? await needsOwnerActivation(user) : false;
@@ -158,6 +162,8 @@ export default async function HomePage() {
             <Carousel title="Em destaque" items={featured} currency={cur} />
             <Carousel title="Com promoções" items={promos} currency={cur} href="/restaurantes?promo=1" />
             <Carousel title="Entrega mais rápida" items={fast} currency={cur} href="/restaurantes?ordenar=eta" />
+            <Carousel title="Mais bem avaliados" items={topRated} currency={cur} href="/restaurantes?ordenar=rating" />
+            <Carousel title="Novidades no DeliveryMoz" items={newest} currency={cur} />
 
             {products.length > 0 && (
               <section className="mt-10" aria-labelledby="pratos">

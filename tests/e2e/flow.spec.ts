@@ -330,16 +330,23 @@ test.describe.serial("fluxo completo", () => {
     const code = fs.readFileSync(`${STATE_DIR}/order.txt`, "utf8");
     const page = await newPage(browser, `${STATE_DIR}/owner.json`);
     await page.goto("/parceiro/pedidos");
-    const card = page.locator("li", { hasText: `#${code}` });
-    await expect(card).toBeVisible();
+    await expect(page.getByRole("link", { name: /Novos/ })).toContainText("1");
+    await page.getByRole("link", { name: new RegExp(`#${code}`) }).click();
+    const card = page.getByRole("region", { name: "Detalhe do pedido" });
+    await expect(card).toContainText(`#${code}`);
+    await expect(card).toContainText("Prato E2E");
     await card.getByRole("button", { name: "Aceitar" }).click();
     await expect(card.getByRole("button", { name: "Iniciar preparação" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Em preparação/ })).toHaveAttribute("aria-current", "page");
     await card.getByRole("button", { name: "Iniciar preparação" }).click();
     await card.getByRole("button", { name: "Marcar pronto" }).click();
     await card.getByRole("button", { name: "Saiu para entrega" }).click();
     await card.getByLabel(/Recebi/).check();
     await card.getByRole("button", { name: "Entregue" }).click();
-    await expect(page.locator("li", { hasText: `#${code}` })).toHaveCount(0);
+    await expect(page.getByText("Sem pedidos em curso")).toBeVisible();
+    // O pedido passa para o histórico
+    await page.getByRole("link", { name: "Histórico" }).click();
+    await expect(page.getByText(`#${code}`).first()).toBeVisible();
 
     const customer = await newPage(browser, `${STATE_DIR}/customer.json`);
     await customer.goto(`/acompanhar/${code}`);

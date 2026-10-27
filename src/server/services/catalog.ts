@@ -47,7 +47,7 @@ export async function listRestaurants(f: CatalogFilters) {
     orderBy: [{ isFeatured: "desc" }, { ratingAvg: "desc" }, { name: "asc" }],
     select: {
       id: true, slug: true, name: true, description: true, logoFileId: true, coverFileId: true, ratingAvg: true, ratingCount: true,
-      status: true, acceptingOrders: true, prepTimeMinutes: true, minOrderCents: true, isFeatured: true, cityId: true,
+      status: true, acceptingOrders: true, prepTimeMinutes: true, minOrderCents: true, isFeatured: true, cityId: true, approvedAt: true, createdAt: true,
       hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
       zones: { where: { isActive: true }, select: { neighborhoodId: true, feeCents: true, etaMinutes: true } },
       cuisines: { select: { name: true, slug: true } },
@@ -64,7 +64,7 @@ export async function listRestaurants(f: CatalogFilters) {
       id: r.id, slug: r.slug, name: r.name, description: r.description, logoFileId: r.logoFileId, coverFileId: r.coverFileId,
       ratingAvg: r.ratingAvg, ratingCount: r.ratingCount, isFeatured: r.isFeatured, minOrderCents: r.minOrderCents,
       cuisines: r.cuisines, availability: restaurantAvailability(r, settings.timezone, now),
-      deliveryFeeCents, feeIsFrom: !zone, etaMinutes: eta, hasPromo: r.coupons.length > 0,
+      deliveryFeeCents, feeIsFrom: !zone, etaMinutes: eta, hasPromo: r.coupons.length > 0, listedSince: r.approvedAt ?? r.createdAt,
     };
   });
   if (f.openOnly) list = list.filter((r) => r.availability.orderable);
