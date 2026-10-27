@@ -9,6 +9,7 @@ import { needsOwnerActivation } from "@/server/services/accounts";
 import { RestaurantCard } from "@/components/public/restaurant-card";
 import { LocationButton } from "@/components/public/location-button";
 import { HeroFoodArt } from "@/components/public/food-art";
+import { CategoryShortcuts, InfoCards } from "@/components/public/home-blocks";
 import { buttonClass } from "@/components/ui/button-class";
 import { OrderStatusBadge, formatDate } from "@/components/status";
 import { formatMoney } from "@/lib/money";
@@ -47,13 +48,22 @@ export default async function HomePage() {
       )}
       {user ? (
         /* Área do comprador */
-        <section className="border-b border-line bg-surface">
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
-            <p className="text-sm font-semibold text-brand">Olá, {firstName}</p>
-            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">O que vai ser hoje?</h1>
-            <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-[1fr_1.4fr]">
-              <LocationButton geography={geography} location={location} variant="hero" />
-              <SearchBox />
+        <section className="bg-surface pt-4 sm:pt-6">
+          <div className="mx-auto max-w-7xl px-4">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand to-[#c7321c] px-5 py-7 text-white sm:px-10 sm:py-10">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10" aria-hidden />
+              <div className="pointer-events-none absolute -bottom-24 right-40 h-56 w-56 rounded-full bg-black/10" aria-hidden />
+              <div className="relative grid items-center gap-6 lg:grid-cols-[1.3fr_1fr]">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white/85">Olá, {firstName} 👋</p>
+                  <h1 className="mt-1 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">O que vai ser hoje?</h1>
+                  <p className="mt-2 max-w-md text-sm text-white/85 sm:text-base">
+                    {location ? `A mostrar restaurantes que entregam em ${location.neighborhoodName ?? location.cityName}.` : "Escolhe a tua localização no topo da página para veres quem entrega aí."}
+                  </p>
+                  <div className="mt-5 max-w-xl"><SearchBox /></div>
+                </div>
+                <div className="hidden justify-self-end lg:block"><HeroFoodArt className="h-56 w-auto drop-shadow-xl" /></div>
+              </div>
             </div>
           </div>
         </section>
@@ -108,18 +118,14 @@ export default async function HomePage() {
           </section>
         )}
 
-        {cuisines.length > 0 && (
-          <section className="mt-8" aria-labelledby="categorias">
-            <SectionTitle id="categorias" title="Categorias" />
-            <nav className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1" aria-label="Categorias">
-              {cuisines.map((c) => (
-                <Link key={c.id} href={`/restaurantes?categoria=${c.slug}`} className="flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:border-brand hover:text-brand">
-                  {c.emoji && <span aria-hidden>{c.emoji}</span>}{c.name}
-                </Link>
-              ))}
-            </nav>
-          </section>
-        )}
+        <section className="mt-8" aria-labelledby="categorias">
+          <SectionTitle id="categorias" title={cuisines.length ? "Categorias" : "O que te apetece?"} href="/restaurantes" />
+          <CategoryShortcuts cuisines={cuisines} />
+        </section>
+
+        <section className="mt-8" aria-label="Destaques da plataforma">
+          <InfoCards loggedIn={!!user} />
+        </section>
 
         {banners.length > 0 && (
           <section className="scrollbar-none -mx-4 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4" aria-label="Promoções">
@@ -143,18 +149,18 @@ export default async function HomePage() {
         )}
 
         {all.length === 0 ? (
-          <section className="mt-8 grid gap-6 rounded-3xl border border-dashed border-line bg-surface px-5 py-10 text-center sm:px-10" aria-labelledby="sem-restaurantes">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand/10 text-brand"><Store className="h-7 w-7" aria-hidden /></span>
-            <div>
-              <h2 id="sem-restaurantes" className="text-lg font-bold">Ainda não existem restaurantes disponíveis nesta região.</h2>
-              <p className="mx-auto mt-2 max-w-lg text-sm text-muted">
+          <section className="mt-10 grid items-center gap-6 overflow-hidden rounded-3xl bg-surface p-6 shadow-sm ring-1 ring-line sm:p-10 md:grid-cols-[1fr_auto]" aria-labelledby="sem-restaurantes">
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand"><Store className="h-3.5 w-3.5" aria-hidden /> Restaurantes</span>
+              <h2 id="sem-restaurantes" className="mt-3 text-xl font-extrabold tracking-tight sm:text-2xl">Ainda não existem restaurantes disponíveis nesta região.</h2>
+              <p className="mt-2 max-w-lg text-sm text-muted sm:text-base">
                 {location ? `Ainda nenhum restaurante entrega em ${location.neighborhoodName ?? location.cityName}. Experimenta outra localização ou volta em breve.` : "Escolhe a tua localização para veres os restaurantes que entregam aí."}
               </p>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <Link href="/restaurantes" className={buttonClass("primary", "lg")}>Ver todos os restaurantes <ArrowRight className="h-4 w-4" /></Link>
+              </div>
             </div>
-            <div className="mx-auto flex w-full max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
-              <div className="sm:min-w-56"><LocationButton geography={geography} location={location} variant="hero" /></div>
-              <Link href="/parceiro/registo" className={buttonClass("outline", "lg")}>Registar o meu restaurante</Link>
-            </div>
+            <div className="hidden md:block"><HeroFoodArt className="h-48 w-auto" /></div>
           </section>
         ) : (
           <>
@@ -258,7 +264,7 @@ function SearchBox() {
   return (
     <form action="/restaurantes" className="relative" role="search">
       <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" aria-hidden />
-      <input name="q" type="search" placeholder="Pratos, restaurantes, tipos de comida" aria-label="Pesquisar restaurantes e pratos" className="h-full min-h-14 w-full rounded-2xl border border-line bg-surface pl-12 pr-4 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15" />
+      <input name="q" type="search" placeholder="Pratos, restaurantes, tipos de comida" aria-label="Pesquisar restaurantes e pratos" className="h-full min-h-14 w-full rounded-2xl border border-line bg-surface pl-12 pr-4 text-sm text-ink shadow-sm placeholder:text-muted focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15" />
     </form>
   );
 }
