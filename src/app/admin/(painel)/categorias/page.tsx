@@ -40,7 +40,7 @@ export default async function AdminCategories({ searchParams }: { searchParams: 
           <FilterBar action="/admin/categorias" q={sp.q} qPlaceholder="Pesquisar categoria" clearHref="/admin/categorias">
             <FilterSelect name="restaurante" value={current.id} label="Restaurante" options={restaurants.map((r) => [r.id, r.name])} />
           </FilterBar>
-          <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+          <div className="grid gap-5 lg:grid-cols-[1fr_340px] [&>*]:min-w-0">
             <div>
               {cats.length === 0 ? (
                 <EmptyState icon={FolderTree} title={sp.q ? "Nenhuma categoria encontrada" : `${current.name} ainda não tem categorias`} description="As categorias são opcionais: os produtos sem categoria aparecem no fim do cardápio." />

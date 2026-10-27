@@ -18,59 +18,65 @@ export default async function PublicLayout({ children }: { children: React.React
   return (
     <div className="flex min-h-dvh flex-col pb-20 md:pb-0">
       <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur pt-safe">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-4">
-          <span className="md:hidden"><Logo compact /></span>
-          <span className="hidden md:block"><Logo /></span>
-          <div className="min-w-0 flex-1 md:flex-none md:max-w-xs">
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3">
+          <span className="sm:hidden"><Logo compact /></span>
+          <span className="hidden sm:block"><Logo /></span>
+          <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Principal">
+            {[["/", "Início"], ["/restaurantes", "Explorar restaurantes"], ...(user ? [] : [["/#como-funciona", "Como funciona"]]), [user?.restaurantMembers.length ? "/parceiro" : "/#parceiros", "Para restaurantes"]].map(([href, label]) => (
+              <Link key={label} href={href} className="rounded-full px-3 py-2 text-sm font-semibold text-ink/75 hover:bg-ink/5 hover:text-ink">{label}</Link>
+            ))}
+          </nav>
+          <div className="min-w-0 flex-1 md:ml-auto md:max-w-xs md:flex-none">
             <LocationButton geography={geography} location={location} />
           </div>
-          <form action="/restaurantes" className="relative hidden flex-1 md:block" role="search">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
-            <input name="q" type="search" placeholder="Procurar restaurantes ou pratos" aria-label="Pesquisar" className="h-11 w-full rounded-full border border-line bg-bg pl-10 pr-4 text-sm focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15" />
-          </form>
-          <nav className="flex items-center gap-1" aria-label="Conta">
+          <nav className="flex shrink-0 items-center gap-1" aria-label="Conta">
+            <Link href="/restaurantes" className="hidden h-10 w-10 place-items-center rounded-full hover:bg-ink/5 md:grid" aria-label="Pesquisar"><Search className="h-5 w-5" /></Link>
             {user ? (
               <>
                 <Link href="/minha-conta/notificacoes" className="relative grid h-10 w-10 place-items-center rounded-full hover:bg-ink/5" aria-label={`Notificações${unread ? ` (${unread} por ler)` : ""}`}>
                   <Bell className="h-5 w-5" />
                   {unread > 0 && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-surface" />}
                 </Link>
+                {isAdminUser(user) && <Link href="/admin" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 xl:block">Centro de controlo</Link>}
+                {user.restaurantMembers.length > 0 && <Link href="/parceiro" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 xl:block">Meu restaurante</Link>}
+                {user.courier && <Link href="/entregador" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 xl:block">Entregas</Link>}
                 <Link href="/minha-conta" className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold hover:bg-ink/5 md:flex">
                   <User className="h-5 w-5" /> {user.name.split(" ")[0]}
                 </Link>
-                {isAdminUser(user) && <Link href="/admin" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 lg:block">Admin</Link>}
-                {user.restaurantMembers.length > 0 && <Link href="/parceiro" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 lg:block">Restaurante</Link>}
-                {user.courier && <Link href="/entregador" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 lg:block">Entregas</Link>}
               </>
             ) : (
-              <Link href="/entrar" className="rounded-full px-3 py-2 text-sm font-semibold hover:bg-ink/5">Entrar</Link>
+              <>
+                <Link href="/entrar" className="rounded-full px-3 py-2 text-sm font-semibold hover:bg-ink/5">Entrar</Link>
+                <Link href="/registar" className="hidden h-10 items-center rounded-full border border-line px-4 text-sm font-semibold hover:border-brand hover:text-brand sm:flex">Criar conta</Link>
+              </>
             )}
-            <Link href="/sacola" className="relative hidden h-11 items-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-brand-contrast md:flex" aria-label={`Sacola com ${count} itens`}>
+            <Link href="/sacola" className="relative hidden h-10 items-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-brand-contrast md:flex" aria-label={`Sacola com ${count} itens`}>
               <ShoppingBag className="h-5 w-5" /> {count}
             </Link>
           </nav>
         </div>
       </header>
       <main className="flex-1">{children}</main>
-      <footer className="mt-12 border-t border-line bg-surface">
+      <footer className="mt-16 border-t border-line bg-surface">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Logo />
-            <p className="mt-3 text-muted">{settings.tagline || "Comida boa, entregue com cuidado."}</p>
+            <p className="mt-3 max-w-xs text-muted">{settings.tagline || "Restaurantes locais, entregues à tua porta."}</p>
           </div>
           <div>
             <h3 className="mb-3 font-semibold">Plataforma</h3>
             <ul className="space-y-2 text-muted">
-              <li><Link className="hover:text-ink" href="/restaurantes">Restaurantes</Link></li>
-              <li><Link className="hover:text-ink" href="/ajuda">Ajuda</Link></li>
+              <li><Link className="hover:text-ink" href="/restaurantes">Explorar restaurantes</Link></li>
+              <li><Link className="hover:text-ink" href="/#como-funciona">Como funciona</Link></li>
+              <li><Link className="hover:text-ink" href="/ajuda">Ajuda e suporte</Link></li>
             </ul>
           </div>
           <div>
-            <h3 className="mb-3 font-semibold">Parcerias</h3>
+            <h3 className="mb-3 font-semibold">Parceiros</h3>
             <ul className="space-y-2 text-muted">
               <li><Link className="hover:text-ink" href="/parceiro/registo">Registar o meu restaurante</Link></li>
+              <li><Link className="hover:text-ink" href="/entrar/parceiro">Entrar como parceiro</Link></li>
               <li><Link className="hover:text-ink" href="/entregador/registo">Ser entregador</Link></li>
-              <li><Link className="hover:text-ink" href="/admin/login" prefetch={false}>Acesso administrativo</Link></li>
             </ul>
           </div>
           <div>
@@ -83,7 +89,12 @@ export default async function PublicLayout({ children }: { children: React.React
             </ul>
           </div>
         </div>
-        <p className="border-t border-line py-4 text-center text-xs text-muted">© {new Date().getFullYear()} {settings.companyLegalName || settings.platformName}</p>
+        <div className="border-t border-line">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted">
+            <p>© {new Date().getFullYear()} {settings.companyLegalName || settings.platformName}</p>
+            <Link href="/admin/login" prefetch={false} className="hover:text-ink">Administração</Link>
+          </div>
+        </div>
       </footer>
       <BottomNav cartCount={count} />
     </div>

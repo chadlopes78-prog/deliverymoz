@@ -47,7 +47,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         </div>
       </section>
 
-      <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_380px]">
+      <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">
         <Card>
           <CardHeader title="Atividade recente" action={<Link href="/admin/atividade" className="text-sm font-semibold text-brand">Ver tudo</Link>} />
           <CardBody><ActivityList items={activity} /></CardBody>
@@ -71,8 +71,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         <StatCard label="Em andamento" value={o.inProgress} icon={Hourglass} tone="warn" />
         <StatCard label="Concluídos" value={o.delivered} icon={CheckCircle2} tone="accent" />
         <StatCard label="Cancelados/recusados" value={o.cancelled} hint={`Taxa: ${(o.cancelRate * 100).toFixed(1)}%`} icon={XCircle} />
-        <StatCard label="Clientes" value={o.customers} icon={Users} />
-        <StatCard label="Restaurantes" value={`${o.activeRestaurants} / ${o.restaurants}`} hint={`${o.pendingRestaurants} pendentes de aprovação`} icon={Store} />
         <StatCard label="Entregadores" value={o.approvedCouriers} hint={`${o.availableCouriers} disponíveis agora`} icon={Bike} />
       </section>
 

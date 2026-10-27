@@ -96,7 +96,7 @@ export default async function RestaurantPage({ params, searchParams }: { params:
       </div>
       {r.description && <p className="mt-4 max-w-3xl text-sm text-muted">{r.description}</p>}
 
-      <div className="mt-2 grid gap-8 lg:grid-cols-[1fr_300px]">
+      <div className="mt-2 grid gap-8 lg:grid-cols-[1fr_300px] [&>*]:min-w-0">
         <div className="min-w-0">
           <MenuView categories={categories} currency={settings.currency} orderable={availability.orderable} closedLabel={availability.orderable ? "" : `Restaurante ${availability.label.toLowerCase()}`} initialProductId={sp.produto} />
         </div>

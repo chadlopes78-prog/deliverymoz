@@ -4,7 +4,8 @@ Marketplace de entrega de comida com quatro áreas ligadas ao mesmo backend e à
 
 | Área | Rota | Para quem |
 |---|---|---|
-| Site público e conta do cliente | `/`, `/restaurantes`, `/restaurante/[slug]`, `/sacola`, `/checkout`, `/acompanhar/[código]`, `/minha-conta/*` | Clientes |
+| Apresentação e área de compras | `/`, `/restaurantes`, `/restaurante/[slug]`, `/sacola`, `/checkout`, `/acompanhar/[código]`, `/minha-conta/*` | Visitantes e compradores |
+| Entrada | `/entrar` (escolha do perfil), `/entrar/comprador`, `/entrar/parceiro`, `/registar` | Todos |
 | Super Admin | `/admin/*` (login em `/admin/login`) | Proprietário e funcionários com permissões |
 | Restaurantes | `/parceiro/*` (candidatura em `/parceiro/registo`) | Proprietários, gerentes e operadores de cada loja |
 | Entregadores | `/entregador/*` (candidatura em `/entregador/registo`) | Entregadores aprovados |
@@ -61,19 +62,39 @@ Em `/admin/configuracoes/inicial` encontra a lista de passos:
 5. **Pagamentos** — ative os métodos disponíveis. Os métodos sem credenciais no servidor não podem ser ativados.
 6. **Integrações** — verifique o estado de cada serviço externo.
 
-## Menu do painel administrativo
+## Entrada e encaminhamento
+
+`/entrar` mostra duas opções: **Quero fazer pedidos** (comprador) e **Tenho um restaurante** (parceiro). A escolha define o percurso, mas o destino final é sempre decidido no servidor a partir das funções guardadas na base de dados (`src/server/routing.ts`):
+
+| Conta | Destino depois de entrar |
+|---|---|
+| Super Admin ou administrador ativo | `/admin` (centro de controlo), qualquer que seja a opção escolhida |
+| Membro de um restaurante (opção parceiro) | `/parceiro`, com o estado do registo (pendente, aprovado, rejeitado, suspenso) |
+| Sem restaurante (opção parceiro) | `/parceiro/registo` |
+| Comprador | `/` (área de compras: pedidos recentes, "Peça de novo", restaurantes e pratos) |
+
+Um destino explícito (por exemplo, voltar ao checkout) é respeitado. Ninguém obtém permissões por escolher uma opção ou alterar o URL: cada página e cada ação voltam a verificar a sessão, o estado da conta, a função e a propriedade do restaurante.
+
+**Estado do restaurante:** pendente pode preparar cardápio, loja, horários e zonas, mas não recebe pedidos nem usa promoções, equipa ou financeiro; rejeitado não opera; suspenso só conclui pedidos em curso. As mesmas regras são verificadas no servidor (`restaurantStatusAllows`).
+
+**Contas suspensas ou banidas:** suspender (temporário) e banir (definitivo, só o Super Admin) exigem motivo, terminam as sessões ativas e bloqueiam o login. Os pedidos e o histórico mantêm-se e fica registado quem fez a ação e quando. A conta do proprietário nunca pode ser suspensa ou banida.
+
+**Conta do proprietário:** se `OWNER_EMAIL` estiver definido no servidor, só esse e-mail pode ficar com a conta de Super Admin (criada uma única vez em `/admin/login` com o `SETUP_TOKEN`).
+
+## Menu do centro de controlo (Super Admin)
 
 | Secção | Páginas |
 |---|---|
-| Dashboard | Visão geral |
-| Gestão comercial | Restaurantes, Produtos, Categorias, Pedidos |
-| Operações | Entregadores, Clientes, Entregas |
-| Financeiro | Vendas, Comissões, Transações |
+| Dashboard | Visão geral (totais reais da plataforma, atividade recente, desempenho por período) |
+| Gestão comercial | Restaurantes, Pedidos, Produtos, Categorias |
+| Pessoas | Compradores, Parceiros, Utilizadores (ficha com histórico, suspender, banir, reativar) |
+| Operações | Entregadores, Entregas |
+| Financeiro e relatórios | Vendas e relatórios, Comissões, Transações |
 | Marketing | Promoções, Cupões, Banners |
-| Administração | Aprovação de restaurantes, Utilizadores e permissões, Configurações, Segurança e auditoria |
+| Administração | Registos pendentes, Administradores e permissões, Atividade da plataforma, Configurações, Segurança e auditoria |
 | Suporte | Reclamações, Pedidos de ajuda |
 
-Cada item só aparece a quem tem a permissão correspondente; as mesmas permissões são verificadas no servidor em cada ação.
+Os administradores secundários recebem uma função-base ou permissões personalizadas; configurações, administradores, comissões e auditoria são exclusivas do Super Admin. Cada item só aparece a quem tem a permissão, e a mesma permissão é verificada no servidor em cada ação.
 
 ## Adicionar o primeiro restaurante
 
@@ -116,6 +137,7 @@ Ver [`.env.example`](.env.example). Resumo:
 | `APP_URL` | sim | URL pública (e-mails, sitemap, Open Graph) |
 | `CRON_SECRET` | sim | Protege `/api/cron/maintenance` |
 | `SETUP_TOKEN` | só no arranque | Criação da conta do proprietário |
+| `OWNER_EMAIL` | recomendado | E-mail autorizado a ficar com a conta do proprietário |
 | `RESEND_API_KEY`, `EMAIL_FROM` | não | E-mail transacional (Resend) |
 | `BLOB_READ_WRITE_TOKEN` | não | Imagens públicas no Vercel Blob (sem isto ficam na base de dados) |
 | `MPESA_*` | não | Credenciais M-Pesa (ver [docs/PAGAMENTOS.md](docs/PAGAMENTOS.md)) |

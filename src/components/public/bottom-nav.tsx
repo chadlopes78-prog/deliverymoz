@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/", label: "Início", icon: Home, match: (p: string) => p === "/" },
-  { href: "/restaurantes", label: "Buscar", icon: Search, match: (p: string) => p.startsWith("/restaurante") },
+  { href: "/restaurantes", label: "Explorar", icon: Search, match: (p: string) => p.startsWith("/restaurante") },
   { href: "/sacola", label: "Sacola", icon: ShoppingBag, match: (p: string) => p.startsWith("/sacola") || p.startsWith("/checkout") },
   { href: "/minha-conta/pedidos", label: "Pedidos", icon: Receipt, match: (p: string) => p.startsWith("/minha-conta/pedidos") || p.startsWith("/acompanhar") },
   { href: "/minha-conta", label: "Conta", icon: User, match: (p: string) => p === "/minha-conta" || (p.startsWith("/minha-conta/") && !p.startsWith("/minha-conta/pedidos")) },
@@ -22,7 +22,7 @@ export function BottomNav({ cartCount }: { cartCount: number }) {
           const active = match(path);
           return (
             <li key={href}>
-              <Link href={href} className={cn("relative flex flex-col items-center gap-0.5 pt-2 pb-1 text-[11px] font-medium", active ? "text-brand" : "text-muted")} aria-current={active ? "page" : undefined}>
+              <Link href={href} className={cn("relative flex min-h-14 flex-col items-center justify-center gap-0.5 pt-1.5 pb-1 text-[11px] font-medium", active ? "text-brand" : "text-muted")} aria-current={active ? "page" : undefined}>
                 <Icon className="h-5 w-5" aria-hidden />
                 {label}
                 {href === "/sacola" && cartCount > 0 && (

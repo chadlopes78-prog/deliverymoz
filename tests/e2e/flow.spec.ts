@@ -8,6 +8,7 @@ import sharp from "sharp";
  */
 const OWNER = { name: "Proprietário Teste", email: "owner@e2e.test", phone: "841000001", password: "SenhaForte12345" };
 const CUSTOMER = { name: "Cliente Teste", email: "cliente@e2e.test", phone: "842000002", password: "Cliente12345" };
+const PARTNER = { name: "Parceiro E2E", email: "parceiro@e2e.test", phone: "846000006", password: "Parceiro12345" };
 const STATE_DIR = "test-results/state";
 
 /** Imagem PNG gerada no momento (dados sintéticos de teste). */
@@ -26,7 +27,23 @@ async function newPage(browser: Browser, state?: string) {
 test.describe.serial("fluxo completo", () => {
   test("estado inicial vazio e elegante", async ({ page }) => {
     await page.goto("/");
+    await expect(page.getByRole("heading", { name: /Os restaurantes da tua cidade/ })).toBeVisible();
     await expect(page.getByText("Ainda não existem restaurantes disponíveis nesta região.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Como funciona" })).toBeVisible();
+    await page.getByRole("link", { name: "Registar o meu restaurante" }).first().click();
+    await expect(page).toHaveURL(/\/parceiro\/registo/);
+    // Escolha do perfil
+    await page.goto("/entrar");
+    await expect(page.getByRole("heading", { name: "Bem-vindo ao DeliveryMoz" })).toBeVisible();
+    await expect(page.getByText("Quero fazer pedidos")).toBeVisible();
+    await page.getByRole("main").getByRole("link", { name: /Entrar como parceiro/ }).click();
+    await expect(page).toHaveURL(/\/entrar\/parceiro/);
+    await expect(page.getByRole("heading", { name: "Entrar como parceiro" })).toBeVisible();
+    // Rotas protegidas encaminham para o formulário certo
+    await page.goto("/parceiro/pedidos");
+    await expect(page).toHaveURL(/\/entrar\/parceiro\?next=%2Fparceiro%2Fpedidos/);
+    await page.goto("/minha-conta");
+    await expect(page).toHaveURL(/\/entrar\/comprador\?next=%2Fminha-conta/);
     // O admin tem login próprio, fora do site público (sem seletor de localização)
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin/);
@@ -51,7 +68,7 @@ test.describe.serial("fluxo completo", () => {
     await page.waitForURL((u) => u.pathname === "/admin");
     await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
     // Menu agrupado
-    for (const section of ["Gestão comercial", "Operações", "Financeiro", "Marketing", "Administração", "Suporte"]) {
+    for (const section of ["Gestão comercial", "Pessoas", "Operações", "Financeiro e relatórios", "Marketing", "Administração", "Suporte"]) {
       await expect(page.getByText(section, { exact: true }).first()).toBeAttached();
     }
     // Terminar sessão e voltar a entrar pelo login administrativo
@@ -233,7 +250,7 @@ test.describe.serial("fluxo completo", () => {
     await expect(page.getByText("Prato E2E")).toBeVisible();
     await page.getByRole("link", { name: "Continuar" }).click();
     await page.waitForURL(/\/entrar/);
-    await page.getByRole("link", { name: "Criar conta" }).click();
+    await page.getByRole("main").getByRole("link", { name: "Criar conta" }).click();
     await page.getByLabel("Nome completo").fill(CUSTOMER.name);
     await page.getByLabel("E-mail").fill(CUSTOMER.email);
     await page.getByLabel("Telefone").fill(CUSTOMER.phone);
@@ -306,11 +323,137 @@ test.describe.serial("fluxo completo", () => {
   test("dashboards refletem dados reais", async ({ browser }) => {
     const page = await newPage(browser, `${STATE_DIR}/owner.json`);
     await page.goto("/admin");
-    await expect(page.getByText("Concluídos").locator("..").locator("..")).toContainText("1");
+    // Totais calculados a partir da base de dados: 1 pedido entregue, nenhum cancelado
+    await expect(page.getByText("Concluídos / cancelados", { exact: true }).locator("..").locator("..")).toContainText("1 / 0");
+    await expect(page.getByText("Pedidos recebidos", { exact: true }).locator("..").locator("..")).toContainText("1");
+    await expect(page.getByText("Concluídos", { exact: true }).locator("..").locator("..")).toContainText("1");
     await page.goto("/admin/financeiro?tab=liquidacoes");
     await expect(page.getByText("Sabores E2E").first()).toBeVisible();
     const res = await page.request.get("/api/export/orders?periodo=30d");
     expect(res.status()).toBe(200);
     expect(await res.text()).toContain("Sabores E2E");
+  });
+
+  test("super admin entra pelas opções de comprador ou parceiro e vai para o centro de controlo", async ({ browser }) => {
+    for (const option of ["comprador", "parceiro"]) {
+      const page = await newPage(browser);
+      await page.goto(`/entrar/${option}`);
+      await page.getByLabel("E-mail ou telefone").fill(OWNER.email);
+      await page.getByLabel("Palavra-passe").fill(OWNER.password);
+      await page.getByRole("button", { name: "Entrar", exact: true }).click();
+      await page.waitForURL((u) => u.pathname === "/admin");
+      await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
+      await expect(page.getByText("Plataforma (total)")).toBeVisible();
+      await page.context().close();
+    }
+  });
+
+  test("centro de controlo: atividade, compradores, parceiros, utilizadores e administradores", async ({ browser }) => {
+    const code = fs.readFileSync(`${STATE_DIR}/order.txt`, "utf8");
+    const page = await newPage(browser, `${STATE_DIR}/owner.json`);
+    await page.goto("/admin/atividade");
+    await expect(page.getByText(`Novo pedido #${code}`)).toBeVisible();
+    await expect(page.getByText("Novo comprador registado").first()).toBeVisible();
+    await page.goto("/admin/compradores");
+    await expect(page.getByRole("heading", { name: "Compradores" })).toBeVisible();
+    await expect(page.getByText(CUSTOMER.name).first()).toBeVisible();
+    await page.goto("/admin/parceiros");
+    await expect(page.getByText("Sabores E2E").first()).toBeVisible();
+    await page.goto("/admin/utilizadores?perfil=administrador");
+    await expect(page.getByText("Super Admin").first()).toBeVisible();
+    await page.goto("/admin/administradores");
+    await expect(page.getByRole("heading", { name: "Administradores e permissões" })).toBeVisible();
+    // Endereços antigos continuam a funcionar
+    await page.goto("/admin/clientes");
+    await expect(page).toHaveURL(/\/admin\/compradores/);
+  });
+
+  test("parceiro aprovado acede só ao seu painel", async ({ browser }) => {
+    const admin = await newPage(browser, `${STATE_DIR}/owner.json`);
+    await admin.goto("/admin/restaurantes/novo");
+    await admin.getByLabel("Nome comercial").fill("Cantina Parceiro E2E");
+    await admin.getByLabel("Nome do responsável").fill(PARTNER.name);
+    await admin.getByLabel("Telefone", { exact: true }).fill("843000009");
+    await admin.getByLabel("E-mail", { exact: true }).fill("cantina@e2e.test");
+    await admin.getByLabel("Endereço").fill("Rua da Cantina 1");
+    await admin.getByLabel("Conta do proprietário").selectOption("new");
+    await admin.getByLabel("Nome do proprietário").fill(PARTNER.name);
+    await admin.getByLabel("E-mail do proprietário").fill(PARTNER.email);
+    await admin.getByLabel("Telefone do proprietário").fill(PARTNER.phone);
+    await admin.getByLabel("Palavra-passe inicial").fill(PARTNER.password);
+    await admin.getByRole("button", { name: "Criar restaurante" }).click();
+    await admin.waitForURL(/criado=1/);
+    // Identificador de um produto de OUTRO restaurante
+    await admin.goto("/admin/produtos?q=Prato%20E2E");
+    const otherProductHref = await admin.locator("tr", { hasText: "Prato E2E" }).getByRole("link", { name: "Editar" }).getAttribute("href");
+    const otherProductId = otherProductHref!.split("/").pop();
+
+    const partner = await newPage(browser);
+    await partner.goto("/entrar/parceiro");
+    await partner.getByLabel("E-mail ou telefone").fill(PARTNER.email);
+    await partner.getByLabel("Palavra-passe").fill(PARTNER.password);
+    await partner.getByRole("button", { name: "Entrar", exact: true }).click();
+    await partner.waitForURL((u) => u.pathname === "/parceiro");
+    await expect(partner.getByRole("heading", { name: "Cantina Parceiro E2E" })).toBeVisible();
+    await expect(partner.getByText("Pedidos novos")).toBeVisible();
+    // Sem acesso ao centro de controlo nem a produtos de outros restaurantes
+    await partner.goto("/admin");
+    await expect(partner).toHaveURL(/\/admin\/sem-acesso/);
+    const res = await partner.goto(`/parceiro/cardapio/${otherProductId}`);
+    expect(res?.status()).toBe(404);
+  });
+
+  test("registo pendente fica limitado até à aprovação", async ({ browser }) => {
+    const page = await newPage(browser, `${STATE_DIR}/other.json`);
+    await page.goto("/parceiro/registo");
+    await page.getByLabel("Nome comercial").fill("Pendente E2E");
+    await page.getByLabel("Nome do responsável").fill("Outro Cliente");
+    await page.getByLabel("Telefone").fill("847000007");
+    await page.getByLabel("E-mail").fill("pendente@e2e.test");
+    await page.getByLabel("Endereço").fill("Rua Pendente 2");
+    await page.getByRole("button", { name: "Enviar candidatura" }).click();
+    await page.waitForURL(/\/parceiro\?candidatura=1/);
+    await expect(page.getByText("Registo em análise")).toBeVisible();
+    await page.goto("/parceiro/pedidos");
+    await expect(page).toHaveURL(/\/parceiro\?estado=1/);
+    await expect(page.getByText("Disponível depois de o restaurante ser aprovado pela plataforma.")).toBeVisible();
+    const admin = await newPage(browser, `${STATE_DIR}/owner.json`);
+    await admin.goto("/admin/aprovacoes");
+    await expect(admin.getByText("Pendente E2E")).toBeVisible();
+  });
+
+  test("conta banida perde o acesso e mantém o histórico; reativação devolve o acesso", async ({ browser }) => {
+    const code = fs.readFileSync(`${STATE_DIR}/order.txt`, "utf8");
+    const admin = await newPage(browser, `${STATE_DIR}/owner.json`);
+    await admin.goto(`/admin/compradores?q=${encodeURIComponent(CUSTOMER.email)}`);
+    await admin.getByRole("link", { name: CUSTOMER.name }).first().click();
+    await admin.waitForURL(/\/admin\/utilizadores\//);
+    await admin.locator("summary", { hasText: "Banir conta" }).click();
+    await admin.getByLabel("Motivo do banimento (obrigatório)").fill("Teste automatizado de banimento");
+    await admin.getByRole("button", { name: "Banir conta" }).click();
+    await expect(admin.getByRole("button", { name: "Reativar conta" })).toBeVisible();
+    await admin.reload();
+    await expect(admin.getByText("Banida").first()).toBeVisible();
+    await expect(admin.getByText(`#${code}`)).toBeVisible();
+    await expect(admin.getByText("Conta banida").first()).toBeVisible();
+
+    // A sessão existente deixa de funcionar e o login é recusado
+    const customer = await newPage(browser, `${STATE_DIR}/customer.json`);
+    await customer.goto("/minha-conta");
+    await expect(customer).toHaveURL(/\/entrar/);
+    await customer.goto("/entrar/comprador");
+    await customer.getByLabel("E-mail ou telefone").fill(CUSTOMER.email);
+    await customer.getByLabel("Palavra-passe").fill(CUSTOMER.password);
+    await customer.getByRole("button", { name: "Entrar", exact: true }).click();
+    await expect(customer.getByText("O acesso desta conta foi retirado pela plataforma.")).toBeVisible();
+
+    // Reativação
+    await admin.getByRole("button", { name: "Reativar conta" }).click();
+    await expect(admin.getByRole("button", { name: "Reativar conta" })).toHaveCount(0);
+    await expect(admin.getByText("Ativa", { exact: true }).first()).toBeVisible();
+    await customer.getByRole("button", { name: "Entrar", exact: true }).click();
+    await customer.waitForURL((u) => u.pathname === "/");
+    await expect(customer.getByText("Os teus pedidos recentes")).toBeVisible();
+    await customer.context().storageState({ path: `${STATE_DIR}/customer.json` });
   });
 });

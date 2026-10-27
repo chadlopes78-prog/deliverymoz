@@ -29,7 +29,7 @@ export default async function Administrators() {
   return (
     <>
       <PageHeader title="Administradores e permissões" description="Promova contas existentes a administradores secundários e defina o que cada um pode fazer. Configurações, administradores, comissões e auditoria são exclusivos do Super Admin." />
-      <div className="grid gap-5 lg:grid-cols-[1fr_400px]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_400px] [&>*]:min-w-0">
         <div className="space-y-5">
           <Card>
             <CardHeader title="Super Admin" description="Controlo total. Não pode ser rebaixado, suspenso ou bloqueado por outros administradores." />

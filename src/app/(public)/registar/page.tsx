@@ -10,19 +10,22 @@ import { registerAction } from "../actions";
 
 export const metadata: Metadata = { title: "Criar conta", robots: { index: false } };
 
-export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next } = await searchParams;
-  if (await getSessionUser()) redirect("/");
+export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ next?: string; perfil?: string }> }) {
+  const { next, perfil } = await searchParams;
+  const partner = perfil === "parceiro" || next === "/parceiro/registo";
+  if (await getSessionUser()) redirect(partner ? "/parceiro/registo" : "/");
   const settings = await getSettings();
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
-        <h1 className="text-2xl font-bold">Criar conta</h1>
+        <h1 className="text-2xl font-bold">{partner ? "Criar conta de parceiro" : "Criar conta"}</h1>
+        <p className="mt-1 text-sm text-muted">{partner ? "Primeiro cria a conta do proprietário; a seguir preenches os dados do restaurante." : "Para encomendares e acompanhares os teus pedidos."}</p>
         {!settings.registrationOpen ? (
           <p className="mt-4 text-sm text-muted">O registo de novas contas está temporariamente fechado.</p>
         ) : (
           <ActionForm action={registerAction} className="mt-6 space-y-4">
             <input type="hidden" name="next" value={next ?? "/"} />
+            {partner && <input type="hidden" name="intent" value="parceiro" />}
             <Field label="Nome completo" htmlFor="name"><Input id="name" name="name" required minLength={2} autoComplete="name" /></Field>
             <Field label="E-mail" htmlFor="email"><Input id="email" name="email" type="email" required autoComplete="email" /></Field>
             <Field label="Telefone" htmlFor="phone" hint="Número moçambicano, ex.: 84 123 4567"><Input id="phone" name="phone" type="tel" inputMode="tel" required autoComplete="tel" /></Field>
@@ -31,7 +34,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
             <SubmitButton size="lg" className="w-full" pendingText="A criar conta…">Criar conta</SubmitButton>
           </ActionForm>
         )}
-        <p className="mt-6 text-center text-sm text-muted">Já tem conta? <Link href="/entrar" className="font-semibold text-brand">Entrar</Link></p>
+        <p className="mt-6 text-center text-sm text-muted">Já tem conta? <Link href={partner ? "/entrar/parceiro" : `/entrar/comprador${next ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-semibold text-brand">Entrar</Link></p>
       </div>
     </div>
   );

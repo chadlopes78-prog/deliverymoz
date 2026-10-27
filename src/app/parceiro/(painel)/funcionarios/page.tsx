@@ -18,7 +18,7 @@ export default async function Members() {
   return (
     <>
       <PageHeader title="Funcionários" description="Proprietário: acesso total. Gerente: tudo exceto funcionários e dados de liquidação. Operador: apenas pedidos." />
-      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_340px] [&>*]:min-w-0">
         <ul className="space-y-2">
           {members.map((m) => (
             <li key={m.id} className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 text-sm sm:flex-row sm:items-center sm:justify-between">

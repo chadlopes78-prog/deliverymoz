@@ -27,7 +27,7 @@ export default async function Commissions() {
   return (
     <>
       <PageHeader title="Comissões" description="A comissão aplicável é registada em cada pedido no momento da criação: alterações futuras não alteram pedidos anteriores." />
-      <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">
         <Card>
           <CardHeader title="Histórico de regras" description={`Comissão global em vigor: ${(global.bps / 100).toFixed(2)}%${global.fixedCents ? ` + ${formatMoney(global.fixedCents, settings.currency)}` : ""}${global.source === "DEFAULT" ? " (valor por omissão das configurações)" : ""}`} />
           <CardBody>

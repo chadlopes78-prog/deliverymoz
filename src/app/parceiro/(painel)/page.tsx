@@ -98,10 +98,12 @@ export default async function PartnerHome({ searchParams }: { searchParams: Prom
       <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Concluídos (período)" value={cDone} icon={CheckCircle2} tone="accent" />
         <StatCard label="Cancelados (período)" value={cCancel} icon={XCircle} />
-        {canFinance && <StatCard label="Vendas registadas" value={m(o.grossCents)} hint={`${o.salesCount} pedidos no período`} icon={TrendingUp} tone="brand" />}
+        {canFinance && <StatCard label="Vendas registadas" value={m(o.grossCents)} hint={`${o.salesCount} ${o.salesCount === 1 ? "pedido" : "pedidos"} no período`} icon={TrendingUp} tone="brand" />}
         {canFinance && <StatCard label="Ticket médio" value={m(o.avgTicketCents)} icon={Receipt} />}
         <StatCard label="Avaliação" value={o.rating.ratingCount ? o.rating.ratingAvg.toFixed(1) : "—"} hint={`${o.rating.ratingCount} avaliações`} icon={Star} />
-        {canFinance && <StatCard label="Estimado a receber" value={m(o.balance.netCents)} hint="Pedidos entregues e pagos ainda não liquidados" icon={Wallet} tone="warn" />}
+        {canFinance && (o.balance.netCents >= 0
+          ? <StatCard label="Estimado a receber" value={m(o.balance.netCents)} hint="Pedidos entregues e pagos ainda não liquidados" icon={Wallet} tone="warn" />
+          : <StatCard label="A pagar à plataforma" value={m(-o.balance.netCents)} hint="Comissões de pedidos pagos em numerário ao restaurante" icon={Wallet} tone="warn" />)}
       </section>
       <Card className="mt-5">
         <CardHeader title="Atividade recente" />

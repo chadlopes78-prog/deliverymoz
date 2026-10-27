@@ -30,7 +30,7 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
     <>
       <Link href="/admin/suporte" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-brand"><ArrowLeft className="h-4 w-4" /> Suporte</Link>
       <PageHeader title={t.subject} description={`${t.code} · ${TICKET_CATEGORY_LABEL[t.category]} · aberto ${formatDate(t.createdAt)}`} actions={<><Badge>{TICKET_PRIORITY_LABEL[t.priority]}</Badge><Badge tone="yellow">{TICKET_STATUS_LABEL[t.status]}</Badge></>} />
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px] [&>*]:min-w-0">
         <div>
           <ol className="space-y-3">
             {t.messages.map((m) => (

@@ -29,7 +29,7 @@ export default async function CartPage() {
   const c = cart.currency;
   const belowMin = cart.subtotalCents < cart.restaurant.minOrderCents;
   return (
-    <div className="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_340px]">
+    <div className="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_340px] [&>*]:min-w-0">
       <section>
         <div className="flex items-center justify-between gap-3">
           <div>

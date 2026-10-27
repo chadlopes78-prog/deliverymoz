@@ -18,7 +18,7 @@ export default async function Categories() {
   return (
     <>
       <PageHeader title="Categorias do cardápio" description="Organizam o cardápio (ex.: Entradas, Pratos principais, Bebidas)." />
-      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_340px] [&>*]:min-w-0">
         <div>
           {cats.length === 0 ? <EmptyState icon={FolderTree} title="Ainda não existem categorias" /> : (
             <ul className="space-y-2">

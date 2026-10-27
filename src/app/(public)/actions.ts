@@ -16,10 +16,8 @@ import { placeOrder, transitionOrder } from "@/server/services/orders";
 import { startPayment, customerRefreshPayment } from "@/server/services/payments";
 import { toggleFavorite, createReview } from "@/server/services/customer";
 import { createTicket, replyTicket } from "@/server/services/support";
+import { destinationAfterLogin, safeNext, type LoginIntent } from "@/server/routing";
 
-function safeNext(next: string | null | undefined) {
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
-}
 
 async function afterLogin(userId: string) {
   await createSession(userId);
@@ -32,13 +30,13 @@ async function afterLogin(userId: string) {
 }
 
 export async function loginAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
-  let target = safeNext(optStr(fd, "next"));
+  let target = "/";
+  const intent: LoginIntent = str(fd, "intent") === "parceiro" ? "parceiro" : "comprador";
   const result = await runAction(async () => {
     const { ip } = await requestInfo();
     const user = await authenticate(str(fd, "identifier"), String(fd.get("password") ?? ""), ip);
     await afterLogin(user.id);
-    // Sem destino explícito, administradores vão para o painel e não para a página pública.
-    if (target === "/" && (user.isSuperAdmin || (await db.staffMember.findFirst({ where: { userId: user.id, isActive: true } })))) target = "/admin";
+    target = await destinationAfterLogin(user.id, intent, optStr(fd, "next"));
   });
   if (result?.ok) redirect(target);
   return result;
@@ -51,7 +49,7 @@ export async function registerAction(_: ActionResult, fd: FormData): Promise<Act
     const user = await registerCustomer({ name: str(fd, "name"), email: str(fd, "email"), phone: str(fd, "phone"), password: String(fd.get("password") ?? "") }, ip);
     await afterLogin(user.id);
   });
-  if (result?.ok) redirect(safeNext(optStr(fd, "next")));
+  if (result?.ok) redirect(str(fd, "intent") === "parceiro" ? "/parceiro/registo" : safeNext(optStr(fd, "next")));
   return result;
 }
 

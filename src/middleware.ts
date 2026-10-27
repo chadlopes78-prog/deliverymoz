@@ -13,7 +13,10 @@ export function middleware(req: NextRequest) {
   if (needsAuth && !req.cookies.get("dm_session")?.value) {
     const url = req.nextUrl.clone();
     // A área administrativa tem um login próprio, separado da experiência dos clientes.
-    url.pathname = pathname === "/admin" || pathname.startsWith("/admin/") ? "/admin/login" : "/entrar";
+    url.pathname =
+      pathname === "/admin" || pathname.startsWith("/admin/") ? "/admin/login"
+      : pathname === "/parceiro" || pathname.startsWith("/parceiro/") ? "/entrar/parceiro"
+      : "/entrar/comprador";
     url.search = `?next=${encodeURIComponent(pathname + search)}`;
     return NextResponse.redirect(url);
   }

@@ -115,3 +115,25 @@ export async function cuisinesWithRestaurants(cityId?: string | null) {
     orderBy: [{ position: "asc" }, { name: "asc" }],
   });
 }
+
+/** Pratos disponíveis dos restaurantes já publicados (a lista de restaurantes vem filtrada por localização e publicação). */
+export async function availableProducts(restaurantIds: string[], take = 12) {
+  if (!restaurantIds.length) return [];
+  return db.product.findMany({
+    where: { restaurantId: { in: restaurantIds }, status: "ACTIVE" },
+    orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
+    take,
+    select: { id: true, slug: true, name: true, description: true, priceCents: true, imageFileId: true, restaurant: { select: { slug: true, name: true } } },
+  });
+}
+
+/** Restaurantes onde o comprador já encomendou (para "Peça de novo"), só entre os publicados. */
+export async function reorderRestaurantIds(userId: string) {
+  const rows = await db.order.findMany({
+    where: { customerId: userId, status: "DELIVERED" },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+    select: { restaurantId: true },
+  });
+  return Array.from(new Set(rows.map((r) => r.restaurantId)));
+}

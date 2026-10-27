@@ -33,7 +33,7 @@ export default async function PartnerSignup() {
             <div className="mt-6 rounded-2xl border border-line bg-surface p-5">
               <ul className="space-y-2 text-sm">{["Gestão do cardápio, fotografias e preços", "Receção de pedidos com alertas em tempo real", "Relatórios financeiros e liquidações"].map((t) => <li key={t} className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" />{t}</li>)}</ul>
               <p className="mt-4 text-sm">Para se candidatar, entre ou crie uma conta (será a conta do proprietário).</p>
-              <div className="mt-3 flex flex-wrap gap-2"><Link href="/registar?next=/parceiro/registo" className={buttonClass()}>Criar conta</Link><Link href="/entrar?next=/parceiro/registo" className={buttonClass("outline")}>Já tenho conta</Link></div>
+              <div className="mt-3 flex flex-wrap gap-2"><Link href="/registar?perfil=parceiro" className={buttonClass()}>Criar conta</Link><Link href="/entrar/parceiro?next=/parceiro/registo" className={buttonClass("outline")}>Já tenho conta</Link></div>
             </div>
           ) : geography.length === 0 ? <p className="mt-6 rounded-xl bg-amber-50 p-4 text-sm">Ainda não existem cidades atendidas pela plataforma.</p> : (
             <ActionForm action={applyPartnerAction} className="mt-6 space-y-5">

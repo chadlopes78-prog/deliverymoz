@@ -18,9 +18,9 @@ const VIEWPORTS = [
 const STATE_DIR = "test-results/state";
 const shotsDir = "test-results/screens";
 
-const PUBLIC = ["/", "/restaurantes", "/entrar", "/registar", "/ajuda", "/termos", "/parceiro/registo", "/entregador/registo", "/sacola", "/admin/login"];
+const PUBLIC = ["/", "/restaurantes", "/entrar", "/registar", "/ajuda", "/termos", "/parceiro/registo", "/entregador/registo", "/sacola", "/admin/login", "/entrar/comprador", "/entrar/parceiro"];
 const CUSTOMER = ["/minha-conta", "/minha-conta/pedidos", "/minha-conta/enderecos", "/minha-conta/seguranca"];
-const OWNER = ["/admin", "/admin/pedidos", "/admin/restaurantes", "/admin/restaurantes/novo", "/admin/produtos", "/admin/produtos/novo", "/admin/categorias", "/admin/aprovacoes", "/admin/vendas", "/admin/transacoes", "/admin/banners", "/admin/reclamacoes", "/admin/financeiro", "/admin/configuracoes?tab=pagamentos", "/admin/cupons", "/parceiro", "/parceiro/pedidos?tab=historico", "/parceiro/cardapio", "/parceiro/horarios", "/parceiro/loja"];
+const OWNER = ["/admin", "/admin/compradores", "/admin/parceiros", "/admin/utilizadores", "/admin/atividade", "/admin/administradores", "/admin/pedidos", "/admin/restaurantes", "/admin/restaurantes/novo", "/admin/produtos", "/admin/produtos/novo", "/admin/categorias", "/admin/aprovacoes", "/admin/vendas", "/admin/transacoes", "/admin/banners", "/admin/reclamacoes", "/admin/financeiro", "/admin/configuracoes?tab=pagamentos", "/admin/cupons", "/parceiro", "/parceiro/pedidos?tab=historico", "/parceiro/cardapio", "/parceiro/horarios", "/parceiro/loja"];
 
 /** Ficha e edição do restaurante criado no fluxo completo. */
 function restaurantPages() {

@@ -93,7 +93,7 @@ export default async function EditRestaurant({ params }: { params: Promise<{ id:
       <section className="mt-8">
         <h2 className="mb-1 text-lg font-bold">Zonas de entrega</h2>
         <p className="mb-3 text-sm text-muted">Bairros de {r.city.name} atendidos, com taxa e tempo estimado.</p>
-        <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="grid gap-5 lg:grid-cols-[1fr_320px] [&>*]:min-w-0">
           <div>
             {r.zones.length === 0 ? <p className="rounded-2xl border border-dashed border-line p-4 text-sm text-muted">Ainda não há zonas de entrega. Sem zonas, os clientes não podem encomendar.</p> : (
               <ul className="space-y-2">

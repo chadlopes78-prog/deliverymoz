@@ -23,7 +23,7 @@ export default async function Zones() {
   return (
     <>
       <PageHeader title="Zonas de entrega" description={`Bairros de ${r.city.name} atendidos e respetiva taxa de entrega. Modelo atual: ${DELIVERY_MODE_LABEL[r.deliveryMode]}.`} />
-      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_340px] [&>*]:min-w-0">
         <div>
           {r.zones.length === 0 ? <EmptyState icon={MapPin} title="Ainda não definiu zonas de entrega" description="Adicione os bairros onde entrega. Os clientes de outros bairros não podem encomendar." /> : (
             <ul className="space-y-2">
