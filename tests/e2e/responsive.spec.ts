@@ -18,9 +18,17 @@ const VIEWPORTS = [
 const STATE_DIR = "test-results/state";
 const shotsDir = "test-results/screens";
 
-const PUBLIC = ["/", "/restaurantes", "/entrar", "/registar", "/ajuda", "/termos", "/parceiro/registo", "/entregador/registo", "/sacola"];
+const PUBLIC = ["/", "/restaurantes", "/entrar", "/registar", "/ajuda", "/termos", "/parceiro/registo", "/entregador/registo", "/sacola", "/admin/login"];
 const CUSTOMER = ["/minha-conta", "/minha-conta/pedidos", "/minha-conta/enderecos", "/minha-conta/seguranca"];
-const OWNER = ["/admin", "/admin/pedidos", "/admin/restaurantes", "/admin/financeiro", "/admin/configuracoes?tab=pagamentos", "/admin/cupons", "/parceiro", "/parceiro/pedidos?tab=historico", "/parceiro/cardapio", "/parceiro/horarios", "/parceiro/loja"];
+const OWNER = ["/admin", "/admin/pedidos", "/admin/restaurantes", "/admin/restaurantes/novo", "/admin/produtos", "/admin/produtos/novo", "/admin/categorias", "/admin/aprovacoes", "/admin/vendas", "/admin/transacoes", "/admin/banners", "/admin/reclamacoes", "/admin/financeiro", "/admin/configuracoes?tab=pagamentos", "/admin/cupons", "/parceiro", "/parceiro/pedidos?tab=historico", "/parceiro/cardapio", "/parceiro/horarios", "/parceiro/loja"];
+
+/** Ficha e edição do restaurante criado no fluxo completo. */
+function restaurantPages() {
+  const f = `${STATE_DIR}/restaurant.txt`;
+  if (!fs.existsSync(f)) return [];
+  const id = fs.readFileSync(f, "utf8").trim();
+  return [`/admin/restaurantes/${id}`, `/admin/restaurantes/${id}/editar`];
+}
 
 async function checkNoOverflow(page: import("@playwright/test").Page, label: string) {
   const r = await page.evaluate(() => {
@@ -52,7 +60,7 @@ for (const vp of VIEWPORTS) {
     const sets: [string | undefined, string[]][] = [
       [undefined, PUBLIC],
       [fs.existsSync(`${STATE_DIR}/customer.json`) ? `${STATE_DIR}/customer.json` : undefined, CUSTOMER],
-      [fs.existsSync(`${STATE_DIR}/owner.json`) ? `${STATE_DIR}/owner.json` : undefined, OWNER],
+      [fs.existsSync(`${STATE_DIR}/owner.json`) ? `${STATE_DIR}/owner.json` : undefined, [...OWNER, ...restaurantPages()]],
     ];
     const isMobile = vp.width < 500;
     for (const [state, paths] of sets) {

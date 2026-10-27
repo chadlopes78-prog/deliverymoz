@@ -5,7 +5,7 @@ Marketplace de entrega de comida com quatro áreas ligadas ao mesmo backend e à
 | Área | Rota | Para quem |
 |---|---|---|
 | Site público e conta do cliente | `/`, `/restaurantes`, `/restaurante/[slug]`, `/sacola`, `/checkout`, `/acompanhar/[código]`, `/minha-conta/*` | Clientes |
-| Super Admin | `/admin/*` | Proprietário e funcionários com permissões |
+| Super Admin | `/admin/*` (login em `/admin/login`) | Proprietário e funcionários com permissões |
 | Restaurantes | `/parceiro/*` (candidatura em `/parceiro/registo`) | Proprietários, gerentes e operadores de cada loja |
 | Entregadores | `/entregador/*` (candidatura em `/entregador/registo`) | Entregadores aprovados |
 
@@ -38,7 +38,7 @@ npm run dev                     # http://localhost:3000
 
 Não existem credenciais administrativas fixas. O registo público nunca cria administradores.
 
-**Opção A — no navegador:** defina `SETUP_TOKEN` (mínimo 16 caracteres, ex.: `openssl rand -base64 24`) nas variáveis de ambiente, abra `/configuracao`, introduza o código e os seus dados (palavra-passe com pelo menos 12 caracteres). A página só funciona enquanto não existir nenhum Super Admin e fica bloqueada depois.
+**Opção A — no navegador:** defina `SETUP_TOKEN` (mínimo 16 caracteres, ex.: `openssl rand -base64 24`) nas variáveis de ambiente, abra `/admin/login`, introduza o código e os seus dados (palavra-passe com pelo menos 12 caracteres). Enquanto não existir nenhum Super Admin, esta página mostra o formulário de criação; depois disso passa a ser o login administrativo (e-mail e palavra-passe), com ligação para recuperar a palavra-passe. O endereço antigo `/configuracao` redireciona para aqui.
 
 **Opção B — linha de comandos:**
 
@@ -47,6 +47,8 @@ SETUP_TOKEN=... OWNER_NAME="O Seu Nome" OWNER_EMAIL=voce@exemplo.co.mz OWNER_PHO
 ```
 
 Depois de criada a conta, pode remover `SETUP_TOKEN` do ambiente.
+
+O login administrativo fica separado do site público: contas sem permissões administrativas veem "Acesso recusado" (`/admin/sem-acesso`) e nunca entram no painel.
 
 ## Configuração inicial
 
@@ -59,23 +61,35 @@ Em `/admin/configuracoes/inicial` encontra a lista de passos:
 5. **Pagamentos** — ative os métodos disponíveis. Os métodos sem credenciais no servidor não podem ser ativados.
 6. **Integrações** — verifique o estado de cada serviço externo.
 
+## Menu do painel administrativo
+
+| Secção | Páginas |
+|---|---|
+| Dashboard | Visão geral |
+| Gestão comercial | Restaurantes, Produtos, Categorias, Pedidos |
+| Operações | Entregadores, Clientes, Entregas |
+| Financeiro | Vendas, Comissões, Transações |
+| Marketing | Promoções, Cupões, Banners |
+| Administração | Aprovação de restaurantes, Utilizadores e permissões, Configurações, Segurança e auditoria |
+| Suporte | Reclamações, Pedidos de ajuda |
+
+Cada item só aparece a quem tem a permissão correspondente; as mesmas permissões são verificadas no servidor em cada ação.
+
 ## Adicionar o primeiro restaurante
 
-**Como administrador:** em `/admin/restaurantes/novo`, preencha os dados. Em "Conta do proprietário" pode:
-- criar uma conta nova para o dono do restaurante;
-- associar uma conta existente (pode ser a sua, se quiser gerir o cardápio diretamente);
-- não associar conta por agora.
+**Como administrador:** Gestão comercial → Restaurantes → **Adicionar restaurante**. Preencha nome, responsável, telefone, e-mail, descrição, cidade, bairro, endereço, localização (opcional, pode usar o GPS do dispositivo), logótipo e capa. Em "Conta do proprietário" pode criar uma conta nova para o dono, associar uma conta existente (pode ser a sua) ou não associar nenhuma por agora. O restaurante criado pelo admin fica aprovado.
 
-O restaurante criado pelo admin fica aprovado. **Por candidatura:** o dono cria conta e preenche `/parceiro/registo`. A candidatura fica pendente até a aprovar em `/admin/restaurantes/[id]`.
+Depois, em **Editar**, defina o **horário** e as **zonas de entrega**. Na lista pode **pausar**, **ativar** ou **suspender** cada restaurante.
+
+**Por candidatura:** o dono cria conta e preenche `/parceiro/registo`. A candidatura fica pendente (uma submissão repetida não cria duplicados) e aparece em Administração → **Aprovação de restaurantes**, onde a pode aprovar ou rejeitar com motivo.
 
 ## Adicionar o primeiro produto
 
-No painel do restaurante (`/parceiro`):
-1. **Categorias** (opcional): por exemplo, "Pratos principais" e "Bebidas".
-2. **Cardápio → Novo produto**: nome, descrição, preço, fotografia (JPG/PNG/WebP até 8 MB, convertida para WebP e sem metadados), categoria, variantes ("Tamanho": mínimo 1, máximo 1) e complementos ("Extras": mínimo 0, máximo N).
-3. **Horários** e **Zonas de entrega** (bairros com taxa e tempo estimado).
+**Como administrador:** Gestão comercial → **Produtos** → **Adicionar produto**: restaurante, nome, categoria (criada em Gestão comercial → Categorias), descrição, preço em MZN, fotografia enviada a partir do dispositivo (JPG/PNG/WebP até 8 MB, convertida para WebP e sem metadados), disponibilidade, tempo de preparação, variantes ("Tamanho": mínimo 1, máximo 1) e complementos ("Extras": mínimo 0, máximo N). Na lista pode alterar o preço, ativar/desativar e eliminar: um produto que já tenha pedidos é **arquivado**, para preservar o histórico.
 
-O restaurante só aparece aos clientes quando estiver **aprovado** e tiver **horário**, **pelo menos uma zona de entrega** e **pelo menos um produto ativo**. O painel mostra o que falta.
+**Como restaurante:** o mesmo editor existe no painel do restaurante (`/parceiro/cardapio`).
+
+O restaurante só aparece aos clientes quando estiver **aprovado** e tiver **horário**, **pelo menos uma zona de entrega** e **pelo menos um produto ativo**. A ficha do restaurante mostra o que falta.
 
 ## Comandos
 

@@ -1,48 +1,79 @@
 import { test, expect, type Browser } from "@playwright/test";
 import fs from "node:fs";
+import sharp from "sharp";
 
 /**
  * Fluxo completo com dados sintéticos numa base de dados E2E:
- * proprietário → configuração → restaurante → cardápio → cliente encomenda → restaurante processa → avaliação.
+ * proprietário → login administrativo → restaurante e produtos pelo admin → cliente encomenda → restaurante processa → avaliação.
  */
 const OWNER = { name: "Proprietário Teste", email: "owner@e2e.test", phone: "841000001", password: "SenhaForte12345" };
 const CUSTOMER = { name: "Cliente Teste", email: "cliente@e2e.test", phone: "842000002", password: "Cliente12345" };
 const STATE_DIR = "test-results/state";
 
+/** Imagem PNG gerada no momento (dados sintéticos de teste). */
+function testImage(color: string) {
+  return sharp({ create: { width: 64, height: 64, channels: 3, background: color } }).png().toBuffer();
+}
+
 async function newPage(browser: Browser, state?: string) {
   const ctx = await browser.newContext(state ? { storageState: state } : {});
-  return ctx.newPage();
+  const page = await ctx.newPage();
+  // Aceita as confirmações (window.confirm) das ações destrutivas
+  page.on("dialog", (d) => void d.accept());
+  return page;
 }
 
 test.describe.serial("fluxo completo", () => {
   test("estado inicial vazio e elegante", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("Ainda não existem restaurantes disponíveis nesta região.")).toBeVisible();
+    // O admin tem login próprio, fora do site público (sem seletor de localização)
     await page.goto("/admin");
-    await expect(page).toHaveURL(/\/entrar\?next=%2Fadmin/);
+    await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin/);
+    await expect(page.getByRole("heading", { name: "Criar a conta do proprietário" })).toBeVisible();
+    await expect(page.getByText("Escolher localização")).toHaveCount(0);
+    await page.goto("/admin/produtos");
+    await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2Fprodutos/);
   });
 
-  test("criação segura da conta do proprietário", async ({ page }) => {
+  test("criação segura da conta do proprietário e login administrativo", async ({ page }) => {
     await page.goto("/configuracao");
+    await expect(page).toHaveURL(/\/admin\/login/);
     await page.getByLabel("Código de configuração").fill("errado-errado-errado");
     await page.getByLabel("Nome").fill(OWNER.name);
     await page.getByLabel("E-mail").fill(OWNER.email);
     await page.getByLabel("Telefone").fill(OWNER.phone);
     await page.getByLabel("Palavra-passe").fill(OWNER.password);
-    await page.getByRole("button", { name: "Criar conta do proprietário" }).click();
+    await page.getByRole("button", { name: "Criar conta e entrar no painel" }).click();
     await expect(page.getByText("Código de configuração inválido.")).toBeVisible();
     await page.getByLabel("Código de configuração").fill("e2e-setup-token-0123456789");
-    await page.getByRole("button", { name: "Criar conta do proprietário" }).click();
-    await page.waitForURL("**/admin/configuracoes/inicial");
-    await expect(page.getByRole("heading", { name: "Configuração inicial" })).toBeVisible();
+    await page.getByRole("button", { name: "Criar conta e entrar no painel" }).click();
+    await page.waitForURL((u) => u.pathname === "/admin");
+    await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
+    // Menu agrupado
+    for (const section of ["Gestão comercial", "Operações", "Financeiro", "Marketing", "Administração", "Suporte"]) {
+      await expect(page.getByText(section, { exact: true }).first()).toBeAttached();
+    }
+    // Terminar sessão e voltar a entrar pelo login administrativo
+    await page.getByRole("button", { name: "Terminar sessão" }).first().click();
+    await page.waitForURL("**/admin/login");
+    await expect(page.getByRole("heading", { name: "Painel administrativo" })).toBeVisible();
+    await page.getByLabel("E-mail").fill(OWNER.email);
+    await page.getByLabel("Palavra-passe").fill("palavra-errada-123");
+    await page.getByRole("button", { name: "Entrar no painel" }).click();
+    await expect(page.getByText(/incorretos|inválid/i).first()).toBeVisible();
+    await page.getByLabel("Palavra-passe").fill(OWNER.password);
+    await page.getByRole("button", { name: "Entrar no painel" }).click();
+    await page.waitForURL((u) => u.pathname === "/admin");
+    await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
     fs.mkdirSync(STATE_DIR, { recursive: true });
     await page.context().storageState({ path: `${STATE_DIR}/owner.json` });
-    // A página de configuração deixa de estar disponível
-    await page.goto("/configuracao");
-    await expect(page).toHaveURL(/\/admin\/configuracoes\/inicial/);
+    // Com sessão, o login administrativo leva diretamente ao painel
+    await page.goto("/admin/login");
+    await expect(page).toHaveURL(/\/admin$/);
   });
 
-  test("admin configura região, pagamentos e cria restaurante", async ({ browser }) => {
+  test("admin configura região e pagamentos, cria e edita restaurante", async ({ browser }) => {
     const page = await newPage(browser, `${STATE_DIR}/owner.json`);
     await page.goto("/admin/configuracoes?tab=localizacoes");
     await page.getByLabel("Cidade").fill("Cidade E2E");
@@ -51,52 +82,63 @@ test.describe.serial("fluxo completo", () => {
     await expect(page.getByRole("heading", { name: "Cidade E2E" })).toBeVisible();
 
     await page.goto("/admin/configuracoes?tab=pagamentos");
-    const mpesa = page.locator("div", { has: page.getByRole("heading", { name: "M-Pesa" }) }).last();
     await expect(page.getByText("Em falta: MPESA_API_KEY").first()).toBeVisible();
     const cash = page.locator("form", { has: page.locator('input[name="key"][value="CASH_ON_DELIVERY"]') });
     await cash.getByLabel("Ativar este método").check();
     await cash.getByRole("button", { name: "Guardar" }).click();
     await expect(page.getByText("Método de pagamento atualizado.")).toBeVisible();
-    void mpesa;
 
-    await page.goto("/admin/restaurantes/novo");
+    // Estados vazios reais (sem dados de exemplo)
+    await page.goto("/admin/produtos");
+    await expect(page.getByText("Ainda não adicionaste produtos. Clica em Adicionar produto para começar.")).toBeVisible();
+    await page.goto("/admin/restaurantes");
+    await expect(page.getByRole("heading", { name: "Gestão de restaurantes" })).toBeVisible();
+    await expect(page.getByText("Ainda não existem restaurantes")).toBeVisible();
+
+    await page.getByRole("link", { name: "Adicionar restaurante" }).first().click();
+    await page.waitForURL("**/admin/restaurantes/novo");
+    await page.getByRole("button", { name: "Criar restaurante" }).click();
+    // Validação no navegador e no servidor: nada é criado sem os campos obrigatórios
+    await expect(page).toHaveURL(/\/admin\/restaurantes\/novo/);
     await page.getByLabel("Nome comercial").fill("Sabores E2E");
     await page.getByLabel("Nome do responsável").fill("Resp E2E");
     await page.getByLabel("Telefone", { exact: true }).fill("843000003");
     await page.getByLabel("E-mail", { exact: true }).fill("restaurante@e2e.test");
+    await page.getByLabel("Descrição").fill("Restaurante de teste automatizado");
+    await page.getByLabel("Bairro (opcional)").selectOption({ label: "Bairro Um" });
     await page.getByLabel("Endereço").fill("Av. E2E 100");
+    await page.getByLabel("Latitude (opcional)").fill("-25.9692");
+    await page.getByLabel("Longitude (opcional)").fill("32.5732");
+    await page.getByLabel(/Logótipo/).setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: await testImage("#e11d48") });
     await page.getByLabel("Conta do proprietário").selectOption("existing");
     await page.getByLabel("E-mail do proprietário").fill(OWNER.email);
     await page.getByRole("button", { name: "Criar restaurante" }).click();
     await page.waitForURL(/\/admin\/restaurantes\/.+criado=1/);
     await expect(page.getByText("Restaurante criado.")).toBeVisible();
     await expect(page.getByText("Em falta").first()).toBeVisible();
-  });
+    const restaurantUrl = page.url().split("?")[0];
+    fs.writeFileSync(`${STATE_DIR}/restaurant.txt`, restaurantUrl.split("/admin/restaurantes/")[1]);
 
-  test("restaurante configura cardápio, horário e zonas", async ({ browser }) => {
-    const page = await newPage(browser, `${STATE_DIR}/owner.json`);
-    await page.goto("/parceiro");
-    await expect(page.getByText("Complete a configuração da loja")).toBeVisible();
+    // A lista mostra o registo gravado na base de dados
+    await page.goto("/admin/restaurantes");
+    const row = page.locator("tr", { hasText: "Sabores E2E" });
+    await expect(row).toContainText("Resp E2E");
+    await expect(row).toContainText("Cidade E2E");
+    await expect(row).toContainText("Bairro Um");
+    await expect(row).toContainText("Ativo");
+    await row.getByRole("button", { name: "Pausar" }).click();
+    await expect(row).toContainText("Pausado");
+    await row.getByRole("button", { name: "Ativar" }).click();
+    await expect(row).toContainText("Ativo");
+    await page.goto("/admin/restaurantes?estado=PAUSADO");
+    await expect(page.getByText("Nenhum restaurante encontrado")).toBeVisible();
 
-    await page.goto("/parceiro/categorias");
-    await page.getByLabel("Nome").first().fill("Pratos principais");
-    await page.getByRole("button", { name: "Criar" }).click();
-    await expect(page.getByText("1. Pratos principais")).toBeVisible();
-
-    await page.goto("/parceiro/cardapio/novo");
-    await page.getByLabel("Nome do produto").fill("Prato E2E");
-    await page.getByLabel("Descrição").fill("Prato de teste automatizado");
-    await page.getByLabel(/Preço/).fill("350,00");
-    await page.getByLabel("Categoria").selectOption({ label: "Pratos principais" });
-    await page.getByRole("button", { name: "Adicionar grupo" }).click();
-    await page.getByLabel("Nome do grupo").fill("Tamanho");
-    await page.getByLabel("Mínimo").fill("1");
-    await page.getByLabel("Nome da opção").fill("Normal");
-    await page.getByRole("button", { name: "Criar produto" }).click();
-    await page.waitForURL(/guardado=/);
-    await expect(page.getByText("Prato E2E")).toBeVisible();
-
-    await page.goto("/parceiro/horarios");
+    // Edição: dados, horário e zonas de entrega a partir do admin
+    await page.goto(`${restaurantUrl}/editar`);
+    await page.getByLabel("Descrição").fill("Pratos caseiros (editado)");
+    await page.getByLabel(/^Capa/).setInputFiles({ name: "capa.png", mimeType: "image/png", buffer: await testImage("#0ea5e9") });
+    await page.getByRole("button", { name: "Guardar restaurante" }).click();
+    await expect(page.getByText("Restaurante guardado.")).toBeVisible();
     for (const day of ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]) {
       const box = page.locator("form > div").filter({ has: page.getByText(day, { exact: true }) });
       await box.getByRole("button", { name: "Turno" }).click();
@@ -105,15 +147,74 @@ test.describe.serial("fluxo completo", () => {
     }
     await page.getByRole("button", { name: "Guardar horário" }).click();
     await expect(page.getByText("Horário guardado.")).toBeVisible();
-
-    await page.goto("/parceiro/entregas");
-    await page.getByLabel("Bairro").selectOption({ label: "Bairro Um" });
+    await page.getByLabel("Bairro", { exact: true }).selectOption({ label: "Bairro Um" });
     await page.getByLabel(/Taxa de entrega/).fill("50");
-    await page.getByRole("button", { name: "Adicionar" }).click();
+    await page.getByRole("button", { name: "Adicionar zona" }).click();
     await expect(page.getByText("Zona de entrega guardada.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Descrição")).toHaveValue("Pratos caseiros (editado)");
+    await expect(page.getByText("Bairro Um").last()).toBeVisible();
+  });
 
+  test("admin gere categorias e produtos com fotografia", async ({ browser }) => {
+    const page = await newPage(browser, `${STATE_DIR}/owner.json`);
+    await page.goto("/admin/categorias");
+    await page.getByLabel("Nome da categoria").fill("Pratos principais");
+    await page.getByRole("button", { name: "Criar categoria" }).click();
+    await expect(page.getByText("1. Pratos principais")).toBeVisible();
+
+    await page.goto("/admin/produtos");
+    await page.getByRole("link", { name: "Adicionar produto" }).first().click();
+    await page.waitForURL("**/admin/produtos/novo**");
+    await page.getByLabel("Restaurante").selectOption({ label: "Sabores E2E" });
+    await page.getByLabel("Nome do produto").fill("Prato E2E");
+    await page.getByLabel("Descrição").fill("Prato de teste automatizado");
+    await page.getByLabel("Preço (MZN)").fill("340,00");
+    await page.getByLabel("Categoria").selectOption({ label: "Pratos principais" });
+    await page.getByLabel(/Tempo de preparação/).fill("20");
+    await page.getByLabel(/Fotografia/).setInputFiles({ name: "prato.png", mimeType: "image/png", buffer: await testImage("#16a34a") });
+    await page.getByRole("button", { name: "Adicionar grupo" }).click();
+    await page.getByLabel("Nome do grupo").fill("Tamanho");
+    await page.getByLabel("Mínimo").fill("1");
+    await page.getByLabel("Nome da opção").fill("Normal");
+    await page.getByRole("button", { name: "Criar produto" }).click();
+    await page.waitForURL(/\/admin\/produtos\?guardado=/);
+    await expect(page.getByText("Produto criado com sucesso.")).toBeVisible();
+    const row = page.locator("tr", { hasText: "Prato E2E" });
+    await expect(row).toContainText("Sabores E2E");
+    await expect(row).toContainText("Pratos principais");
+    // A fotografia foi enviada e é servida pelo servidor
+    const src = await row.locator("img").getAttribute("src");
+    expect((await page.request.get(src!)).status()).toBe(200);
+
+    // Alterar preço, desativar e reativar
+    await row.getByLabel("Preço de Prato E2E").fill("350,00");
+    await row.getByRole("button", { name: "OK" }).click();
+    await expect(page.getByText("Preço atualizado.")).toBeVisible();
+    await row.getByRole("button", { name: "Desativar" }).click();
+    await expect(row).toContainText("Indisponível");
+    await row.getByRole("button", { name: "Ativar" }).click();
+    await expect(row).toContainText("Disponível");
+
+    // Editar e confirmar persistência depois de recarregar
+    await row.getByRole("link", { name: "Editar" }).click();
+    await page.getByLabel("Descrição").fill("Prato de teste (editado)");
+    await page.getByRole("button", { name: "Guardar alterações" }).click();
+    await expect(page.getByText("Produto guardado.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Descrição")).toHaveValue("Prato de teste (editado)");
+    await expect(page.getByLabel("Preço (MZN)")).toHaveValue(/^350[.,]00$/);
+    await expect(page.getByLabel(/Tempo de preparação/)).toHaveValue("20");
+
+    // Filtros
+    await page.goto("/admin/produtos?disponibilidade=PAUSED");
+    await expect(page.getByText("Nenhum produto encontrado")).toBeVisible();
+
+    // O restaurante fica pronto e o proprietário vê o produto no seu painel
     await page.goto("/parceiro");
     await expect(page.getByText("Complete a configuração da loja")).toHaveCount(0);
+    await page.goto("/parceiro/cardapio");
+    await expect(page.getByText("Prato E2E")).toBeVisible();
   });
 
   test("cliente regista-se, encomenda e acompanha", async ({ browser }) => {
@@ -188,8 +289,14 @@ test.describe.serial("fluxo completo", () => {
     await other.waitForURL((u) => u.pathname === "/");
     const res = await other.goto(`/acompanhar/${code}`);
     expect(res?.status()).toBe(404);
-    const adminRes = await other.goto("/admin");
-    expect(adminRes?.status()).toBe(404);
+    // Cliente autenticado não entra no admin, nem em páginas internas
+    await other.goto("/admin");
+    await expect(other).toHaveURL(/\/admin\/sem-acesso/);
+    await expect(other.getByRole("heading", { name: "Acesso recusado" })).toBeVisible();
+    await other.goto("/admin/produtos/novo");
+    await expect(other).toHaveURL(/\/admin\/sem-acesso/);
+    await other.goto("/admin/login");
+    await expect(other.getByText("não tem permissões administrativas")).toBeVisible();
     await other.context().storageState({ path: `${STATE_DIR}/other.json` });
   });
 

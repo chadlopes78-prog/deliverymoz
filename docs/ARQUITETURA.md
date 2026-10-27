@@ -85,6 +85,8 @@ Receita efetiva da plataforma (apenas pedidos **entregues e pagos**): comissões
 - Argon2id; sessões aleatórias de 256 bits guardadas como hash SHA-256; cookies `httpOnly`, `SameSite=Lax`, `Secure` em produção.
 - Autorização sempre no servidor. O restaurante ativo é validado contra as associações do utilizador; os IDs enviados pelo navegador são sempre verificados contra o restaurante ou o cliente.
 - Permissões privilegiadas (configurações, funcionários, comissões, auditoria) são exclusivas do Super Admin. O registo público ignora quaisquer campos de função.
+- O painel administrativo tem login próprio (`/admin/login`). Sem sessão, o middleware envia para esse login; com sessão sem permissões administrativas, para `/admin/sem-acesso`.
+- A equipa com `restaurants.manage` (Super Admin e "Gestão de restaurantes") pode gerir o cardápio e a loja de qualquer restaurante a partir do Admin (`assertRestaurantAccess`). Pedidos, equipa, liquidações e promoções do restaurante continuam reservados aos membros do restaurante.
 - Proteção CSRF: Server Actions com verificação de origem nativa do Next.js; a API de localização verifica `Origin`; cookies `SameSite=Lax`.
 - Limitação de tentativas (login, registo, recuperação, tickets, configuração) guardada em PostgreSQL, para funcionar entre instâncias serverless.
 - Uploads: validação por assinatura de bytes (não por extensão), limites de tamanho, re-codificação das imagens (remove EXIF/GPS) e documentos privados servidos apenas após verificação de permissões, com `Content-Security-Policy: sandbox`.

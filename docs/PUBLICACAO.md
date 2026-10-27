@@ -14,7 +14,7 @@ Use, por exemplo, Neon, Supabase ou o Postgres do Marketplace da Vercel. Escolha
 1. Importe o repositório.
 2. Build Command: `npm run vercel-build` (gera o cliente Prisma, aplica as migrações e faz o build).
 3. Variáveis de ambiente (Production e Preview): `DATABASE_URL`, `DIRECT_URL`, `APP_URL` (domínio final), `CRON_SECRET` (aleatório), `SETUP_TOKEN` (só para criar o proprietário) e, opcionalmente, `RESEND_API_KEY`, `EMAIL_FROM`, `BLOB_READ_WRITE_TOKEN` e `MPESA_*`.
-4. Faça o deploy, abra `https://o-seu-dominio/configuracao` e crie a conta do proprietário. Depois, remova `SETUP_TOKEN` e faça um redeploy.
+4. Faça o deploy, abra `https://o-seu-dominio/admin/login` e crie a conta do proprietário com o código `SETUP_TOKEN`. Depois, remova `SETUP_TOKEN` e faça um redeploy. A partir daí, `/admin/login` é o login administrativo.
 
 ## 3. Tarefas periódicas (Cron)
 
