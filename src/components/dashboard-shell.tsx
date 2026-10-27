@@ -4,16 +4,18 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Menu, X, LogOut, LayoutDashboard, Store, Users, Bike, Receipt, Truck, Wallet, Percent, Megaphone, Ticket, LifeBuoy, UserCog,
-  Settings, ScrollText, UtensilsCrossed, FolderTree, Clock, MapPin, Star, Tag, History, User, FileText, Home, type LucideIcon,
+  Settings, ScrollText, UtensilsCrossed, FolderTree, Clock, MapPin, Star, Tag, History, User, FileText, Home, Package, BarChart3,
+  ArrowLeftRight, Image, ShieldCheck, BadgeCheck, MessageSquareWarning, CircleHelp, type LucideIcon,
 } from "lucide-react";
 
 const ICONS = {
   LayoutDashboard, Store, Users, Bike, Receipt, Truck, Wallet, Percent, Megaphone, Ticket, LifeBuoy, UserCog,
-  Settings, ScrollText, UtensilsCrossed, FolderTree, Clock, MapPin, Star, Tag, History, User, FileText, Home,
+  Settings, ScrollText, UtensilsCrossed, FolderTree, Clock, MapPin, Star, Tag, History, User, FileText, Home, Package, BarChart3,
+  ArrowLeftRight, Image, ShieldCheck, BadgeCheck, MessageSquareWarning, CircleHelp,
 } satisfies Record<string, LucideIcon>;
 import { cn } from "@/lib/utils";
 
-export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: number; exact?: boolean };
+export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: number; exact?: boolean; section?: string };
 
 /** Estrutura dos painéis: barra lateral fixa no computador e gaveta no telemóvel. */
 export function DashboardShell({ brand, title, subtitle, nav, children, logoutAction, topRight, bottomNav }: { brand: React.ReactNode; title: string; subtitle?: string; nav: NavItem[]; children: React.ReactNode; logoutAction: () => Promise<void>; topRight?: React.ReactNode; bottomNav?: NavItem[] }) {
@@ -21,22 +23,35 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
   const path = usePathname();
   useEffect(() => setOpen(false), [path]);
   const isActive = (i: NavItem) => (i.exact ? path === i.href : path === i.href || path.startsWith(i.href + "/"));
+  const link = (i: NavItem) => {
+    const Icon = ICONS[i.icon];
+    const active = isActive(i);
+    return (
+      <li key={i.href}>
+        <Link href={i.href} prefetch={false} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition", active ? "bg-brand text-brand-contrast shadow-sm" : "text-ink/75 hover:bg-ink/5 hover:text-ink")}>
+          <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+          <span className="flex-1 truncate">{i.label}</span>
+          {i.badge ? <span className={cn("rounded-full px-1.5 text-xs font-bold", active ? "bg-white/25" : "bg-brand text-brand-contrast")}>{i.badge}</span> : null}
+        </Link>
+      </li>
+    );
+  };
+  // Agrupa itens consecutivos com a mesma secção
+  const groups: { section?: string; items: NavItem[] }[] = [];
+  for (const i of nav) {
+    const last = groups[groups.length - 1];
+    if (last && last.section === i.section) last.items.push(i);
+    else groups.push({ section: i.section, items: [i] });
+  }
   const links = (
-    <ul className="space-y-0.5">
-      {nav.map((i) => {
-        const Icon = ICONS[i.icon];
-        const active = isActive(i);
-        return (
-          <li key={i.href}>
-            <Link href={i.href} prefetch={false} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition", active ? "bg-brand text-brand-contrast" : "text-ink/75 hover:bg-ink/5 hover:text-ink")}>
-              <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
-              <span className="flex-1 truncate">{i.label}</span>
-              {i.badge ? <span className={cn("rounded-full px-1.5 text-xs font-bold", active ? "bg-white/25" : "bg-brand text-brand-contrast")}>{i.badge}</span> : null}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="space-y-4">
+      {groups.map((g, gi) => (
+        <div key={g.section ?? gi}>
+          {g.section && <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted">{g.section}</p>}
+          <ul className="space-y-0.5">{g.items.map(link)}</ul>
+        </div>
+      ))}
+    </div>
   );
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[260px_1fr]">

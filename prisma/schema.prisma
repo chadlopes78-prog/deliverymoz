@@ -3,8 +3,8 @@
 // A moeda de cada pedido é registada no próprio pedido (não é fixa no código).
 
 generator client {
-  provider        = "prisma-client-js"
-  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -53,24 +53,24 @@ model User {
   lastLoginAt          DateTime?
   closedAt             DateTime?
 
-  sessions            Session[]
-  passwordResets      PasswordResetToken[]
-  staff               StaffMember?
-  restaurantMembers   RestaurantMember[]
-  courier             Courier?
-  addresses           Address[]
-  orders              Order[]              @relation("CustomerOrders")
-  favorites           Favorite[]
-  notifications       Notification[]
-  reviews             Review[]
-  tickets             SupportTicket[]      @relation("TicketCreator")
-  assignedTickets     SupportTicket[]      @relation("TicketAssignee")
-  ticketMessages      TicketMessage[]
-  auditLogs           AuditLog[]
-  carts               Cart[]
-  couponRedemptions   CouponRedemption[]
-  files               StoredFile[]
-  orderEvents         OrderStatusEvent[]
+  sessions          Session[]
+  passwordResets    PasswordResetToken[]
+  staff             StaffMember?
+  restaurantMembers RestaurantMember[]
+  courier           Courier?
+  addresses         Address[]
+  orders            Order[]              @relation("CustomerOrders")
+  favorites         Favorite[]
+  notifications     Notification[]
+  reviews           Review[]
+  tickets           SupportTicket[]      @relation("TicketCreator")
+  assignedTickets   SupportTicket[]      @relation("TicketAssignee")
+  ticketMessages    TicketMessage[]
+  auditLogs         AuditLog[]
+  carts             Cart[]
+  couponRedemptions CouponRedemption[]
+  files             StoredFile[]
+  orderEvents       OrderStatusEvent[]
 
   @@index([status])
   @@index([createdAt])
@@ -178,15 +178,15 @@ model City {
 }
 
 model Neighborhood {
-  id            String         @id @default(cuid())
-  cityId        String
-  city          City           @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  name          String
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  zones         DeliveryZone[]
-  addresses     Address[]
-  restaurants   Restaurant[]
+  id          String         @id @default(cuid())
+  cityId      String
+  city        City           @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  name        String
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  zones       DeliveryZone[]
+  addresses   Address[]
+  restaurants Restaurant[]
 
   @@unique([cityId, name])
 }
@@ -215,12 +215,12 @@ enum ProviderMode {
 }
 
 model PaymentProviderConfig {
-  key         PaymentProviderKey @id
-  enabled     Boolean            @default(false)
-  mode        ProviderMode       @default(SANDBOX)
-  displayName String
+  key          PaymentProviderKey @id
+  enabled      Boolean            @default(false)
+  mode         ProviderMode       @default(SANDBOX)
+  displayName  String
   instructions String?
-  updatedAt   DateTime           @updatedAt
+  updatedAt    DateTime           @updatedAt
 }
 
 // ─────────────────────────────── Ficheiros ───────────────────────────────
@@ -231,21 +231,21 @@ enum FileVisibility {
 }
 
 model StoredFile {
-  id          String         @id @default(cuid())
-  ownerId     String?
-  owner       User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  visibility  FileVisibility
-  purpose     String // ex.: restaurant_logo, product_image, courier_document
-  mimeType    String
-  size        Int
-  sha256      String
-  width       Int?
-  height      Int?
-  driver      String // db | vercel-blob
-  data        Bytes?
-  url         String?
+  id           String         @id @default(cuid())
+  ownerId      String?
+  owner        User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  visibility   FileVisibility
+  purpose      String // ex.: restaurant_logo, product_image, courier_document
+  mimeType     String
+  size         Int
+  sha256       String
+  width        Int?
+  height       Int?
+  driver       String // db | vercel-blob
+  data         Bytes?
+  url          String?
   originalName String?
-  createdAt   DateTime       @default(now())
+  createdAt    DateTime       @default(now())
 
   @@index([ownerId])
 }
@@ -265,42 +265,42 @@ enum DeliveryMode {
 }
 
 model Restaurant {
-  id                     String            @id @default(cuid())
-  slug                   String            @unique
-  name                   String
-  legalName              String?
-  nuit                   String?
-  description            String?
-  phone                  String
-  email                  String?
-  responsibleName        String
-  logoFileId             String?
-  coverFileId            String?
-  cityId                 String
-  city                   City              @relation(fields: [cityId], references: [id])
-  neighborhoodId         String?
-  neighborhood           Neighborhood?     @relation(fields: [neighborhoodId], references: [id])
-  addressLine            String
-  addressReference       String?
-  latitude               Float?
-  longitude              Float?
-  status                 RestaurantStatus  @default(PENDING)
-  statusReason           String?
-  approvedAt             DateTime?
-  acceptingOrders        Boolean           @default(true) // pausa manual da loja
-  prepTimeMinutes        Int               @default(30)
-  minOrderCents          Int               @default(0)
+  id                      String           @id @default(cuid())
+  slug                    String           @unique
+  name                    String
+  legalName               String?
+  nuit                    String?
+  description             String?
+  phone                   String
+  email                   String?
+  responsibleName         String
+  logoFileId              String?
+  coverFileId             String?
+  cityId                  String
+  city                    City             @relation(fields: [cityId], references: [id])
+  neighborhoodId          String?
+  neighborhood            Neighborhood?    @relation(fields: [neighborhoodId], references: [id])
+  addressLine             String
+  addressReference        String?
+  latitude                Float?
+  longitude               Float?
+  status                  RestaurantStatus @default(PENDING)
+  statusReason            String?
+  approvedAt              DateTime?
+  acceptingOrders         Boolean          @default(true) // pausa manual da loja
+  prepTimeMinutes         Int              @default(30)
+  minOrderCents           Int              @default(0)
   allowRestaurantDelivery Boolean          @default(true)
-  allowPlatformDelivery  Boolean           @default(false)
-  deliveryMode           DeliveryMode      @default(RESTAURANT)
-  acceptsCashOnDelivery  Boolean           @default(true)
-  payoutDetails          String? // instruções de liquidação (ex.: número M-Pesa / conta bancária)
-  businessInfo           String?
-  isFeatured             Boolean           @default(false)
-  ratingAvg              Float             @default(0)
-  ratingCount            Int               @default(0)
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  allowPlatformDelivery   Boolean          @default(false)
+  deliveryMode            DeliveryMode     @default(RESTAURANT)
+  acceptsCashOnDelivery   Boolean          @default(true)
+  payoutDetails           String? // instruções de liquidação (ex.: número M-Pesa / conta bancária)
+  businessInfo            String?
+  isFeatured              Boolean          @default(false)
+  ratingAvg               Float            @default(0)
+  ratingCount             Int              @default(0)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 
   cuisines        CuisineCategory[]
   members         RestaurantMember[]
@@ -315,7 +315,7 @@ model Restaurant {
   settlements     Settlement[]
   documents       RestaurantDocument[]
   carts           Cart[]
-  coupons         Coupon[]          @relation("CouponRestaurants")
+  coupons         Coupon[]             @relation("CouponRestaurants")
   campaigns       Campaign[]
 
   @@index([status, cityId])
@@ -406,23 +406,24 @@ model MenuCategory {
 }
 
 model Product {
-  id             String        @id @default(cuid())
-  restaurantId   String
-  restaurant     Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  categoryId     String?
-  category       MenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  slug           String
-  name           String
-  description    String?
-  priceCents     Int
-  imageFileId    String?
-  status         ProductStatus @default(ACTIVE)
-  isFeatured     Boolean       @default(false)
-  position       Int           @default(0)
-  availableFrom  Int? // minutos desde a meia-noite
-  availableUntil Int?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  restaurantId    String
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  categoryId      String?
+  category        MenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  slug            String
+  name            String
+  description     String?
+  priceCents      Int
+  imageFileId     String?
+  status          ProductStatus @default(ACTIVE)
+  isFeatured      Boolean       @default(false)
+  position        Int           @default(0)
+  availableFrom   Int? // minutos desde a meia-noite
+  availableUntil  Int?
+  prepTimeMinutes Int? // tempo de preparação específico do produto (opcional)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   optionGroups OptionGroup[]
   orderItems   OrderItem[]
@@ -539,71 +540,71 @@ enum PaymentStatus {
 }
 
 model Order {
-  id                    String             @id @default(cuid())
-  code                  String             @unique
-  customerId            String
-  customer              User               @relation("CustomerOrders", fields: [customerId], references: [id])
-  restaurantId          String
-  restaurant            Restaurant         @relation(fields: [restaurantId], references: [id])
-  status                OrderStatus
-  paymentStatus         PaymentStatus      @default(PENDING)
-  paymentMethod         PaymentProviderKey
-  deliveryMode          DeliveryMode
-  currency              String
+  id                   String             @id @default(cuid())
+  code                 String             @unique
+  customerId           String
+  customer             User               @relation("CustomerOrders", fields: [customerId], references: [id])
+  restaurantId         String
+  restaurant           Restaurant         @relation(fields: [restaurantId], references: [id])
+  status               OrderStatus
+  paymentStatus        PaymentStatus      @default(PENDING)
+  paymentMethod        PaymentProviderKey
+  deliveryMode         DeliveryMode
+  currency             String
   // Instantâneo dos dados do cliente/endereço no momento do pedido
-  customerName          String
-  customerPhone         String
-  cityId                String
-  cityName              String
-  neighborhoodId        String
-  neighborhoodName      String
-  street                String
-  addressReference      String?
-  latitude              Float?
-  longitude             Float?
-  notesForRestaurant    String?
-  notesForDelivery      String?
+  customerName         String
+  customerPhone        String
+  cityId               String
+  cityName             String
+  neighborhoodId       String
+  neighborhoodName     String
+  street               String
+  addressReference     String?
+  latitude             Float?
+  longitude            Float?
+  notesForRestaurant   String?
+  notesForDelivery     String?
   // Valores (centavos)
-  subtotalCents         Int
-  discountCents         Int                @default(0)
-  discountFundedBy      String? // PLATFORM | RESTAURANT
-  deliveryFeeCents      Int
-  serviceFeeCents       Int                @default(0)
-  totalCents            Int
-  commissionBps         Int
-  commissionFixedCents  Int                @default(0)
-  commissionCents       Int
-  restaurantNetCents    Int
-  courierFeeCents       Int                @default(0)
-  couponId              String?
-  coupon                Coupon?            @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  prepTimeMinutes       Int?
-  estimatedReadyAt      DateTime?
-  idempotencyKey        String
-  cancelReason          String?
-  cancelledByRole       String?
-  rejectReason          String?
-  cashCollectedAt       DateTime?
-  cashCollectedById     String?
-  settlementId          String?
-  settlement            Settlement?        @relation(fields: [settlementId], references: [id], onDelete: SetNull)
-  placedAt              DateTime?
-  acceptedAt            DateTime?
-  readyAt               DateTime?
-  pickedUpAt            DateTime?
-  deliveredAt           DateTime?
-  cancelledAt           DateTime?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  subtotalCents        Int
+  discountCents        Int                @default(0)
+  discountFundedBy     String? // PLATFORM | RESTAURANT
+  deliveryFeeCents     Int
+  serviceFeeCents      Int                @default(0)
+  totalCents           Int
+  commissionBps        Int
+  commissionFixedCents Int                @default(0)
+  commissionCents      Int
+  restaurantNetCents   Int
+  courierFeeCents      Int                @default(0)
+  couponId             String?
+  coupon               Coupon?            @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  prepTimeMinutes      Int?
+  estimatedReadyAt     DateTime?
+  idempotencyKey       String
+  cancelReason         String?
+  cancelledByRole      String?
+  rejectReason         String?
+  cashCollectedAt      DateTime?
+  cashCollectedById    String?
+  settlementId         String?
+  settlement           Settlement?        @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+  placedAt             DateTime?
+  acceptedAt           DateTime?
+  readyAt              DateTime?
+  pickedUpAt           DateTime?
+  deliveredAt          DateTime?
+  cancelledAt          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
-  items       OrderItem[]
-  events      OrderStatusEvent[]
-  payments    Payment[]
-  refunds     Refund[]
-  delivery    Delivery?
-  review      Review?
-  redemption  CouponRedemption?
-  tickets     SupportTicket[]
+  items      OrderItem[]
+  events     OrderStatusEvent[]
+  payments   Payment[]
+  refunds    Refund[]
+  delivery   Delivery?
+  review     Review?
+  redemption CouponRedemption?
+  tickets    SupportTicket[]
 
   @@unique([customerId, idempotencyKey])
   @@index([restaurantId, status])
@@ -632,16 +633,16 @@ model OrderItem {
 }
 
 model OrderStatusEvent {
-  id          String       @id @default(cuid())
-  orderId     String
-  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  fromStatus  OrderStatus?
-  toStatus    OrderStatus
-  actorId     String?
-  actor       User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  actorRole   String
-  note        String?
-  createdAt   DateTime     @default(now())
+  id         String       @id @default(cuid())
+  orderId    String
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorId    String?
+  actor      User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole  String
+  note       String?
+  createdAt  DateTime     @default(now())
 
   @@index([orderId, createdAt])
 }
@@ -649,26 +650,26 @@ model OrderStatusEvent {
 // ─────────────────────────────── Pagamentos ───────────────────────────────
 
 model Payment {
-  id                    String             @id @default(cuid())
-  orderId               String
-  order                 Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  provider              PaymentProviderKey
-  status                PaymentStatus      @default(PENDING)
-  amountCents           Int
-  currency              String
-  reference             String             @unique // referência enviada ao fornecedor
-  providerTransactionId String?
+  id                     String             @id @default(cuid())
+  orderId                String
+  order                  Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider               PaymentProviderKey
+  status                 PaymentStatus      @default(PENDING)
+  amountCents            Int
+  currency               String
+  reference              String             @unique // referência enviada ao fornecedor
+  providerTransactionId  String?
   providerConversationId String?
-  payerPhone            String?
-  failureCode           String?
-  failureMessage        String?
-  attempts              Int                @default(0)
-  lastCheckedAt         DateTime?
-  paidAt                DateTime?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  events                PaymentEvent[]
-  refunds               Refund[]
+  payerPhone             String?
+  failureCode            String?
+  failureMessage         String?
+  attempts               Int                @default(0)
+  lastCheckedAt          DateTime?
+  paidAt                 DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  events                 PaymentEvent[]
+  refunds                Refund[]
 
   @@unique([provider, providerTransactionId])
   @@index([orderId])
@@ -744,26 +745,26 @@ enum VehicleType {
 }
 
 model Courier {
-  id            String          @id @default(cuid())
-  userId        String          @unique
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cityId        String
-  city          City            @relation(fields: [cityId], references: [id])
-  vehicleType   VehicleType
-  vehiclePlate  String?
-  idNumber      String?
-  status        CourierStatus   @default(PENDING)
-  statusReason  String?
-  isAvailable   Boolean         @default(false)
-  payoutDetails String?
-  approvedAt    DateTime?
-  lastLatitude  Float?
-  lastLongitude Float?
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cityId         String
+  city           City          @relation(fields: [cityId], references: [id])
+  vehicleType    VehicleType
+  vehiclePlate   String?
+  idNumber       String?
+  status         CourierStatus @default(PENDING)
+  statusReason   String?
+  isAvailable    Boolean       @default(false)
+  payoutDetails  String?
+  approvedAt     DateTime?
+  lastLatitude   Float?
+  lastLongitude  Float?
   lastLocationAt DateTime?
-  ratingAvg     Float           @default(0)
-  ratingCount   Int             @default(0)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  ratingAvg      Float         @default(0)
+  ratingCount    Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   documents  CourierDocument[]
   deliveries Delivery[]
@@ -793,25 +794,25 @@ enum DeliveryStatus {
 }
 
 model Delivery {
-  id             String         @id @default(cuid())
-  orderId        String         @unique
-  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status         DeliveryStatus @default(SEARCHING)
-  courierId      String?
-  courier        Courier?       @relation(fields: [courierId], references: [id], onDelete: SetNull)
-  cityId         String
+  id              String          @id @default(cuid())
+  orderId         String          @unique
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status          DeliveryStatus  @default(SEARCHING)
+  courierId       String?
+  courier         Courier?        @relation(fields: [courierId], references: [id], onDelete: SetNull)
+  cityId          String
   courierFeeCents Int
-  dispatchRound  Int            @default(0)
-  assignedAt     DateTime?
-  pickedUpAt     DateTime?
-  deliveredAt    DateTime?
-  cancelledAt    DateTime?
+  dispatchRound   Int             @default(0)
+  assignedAt      DateTime?
+  pickedUpAt      DateTime?
+  deliveredAt     DateTime?
+  cancelledAt     DateTime?
   courierPayoutId String?
-  courierPayout  CourierPayout? @relation(fields: [courierPayoutId], references: [id], onDelete: SetNull)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  offers         DeliveryOffer[]
-  issues         DeliveryIssue[]
+  courierPayout   CourierPayout?  @relation(fields: [courierPayoutId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  offers          DeliveryOffer[]
+  issues          DeliveryIssue[]
 
   @@index([status, cityId])
   @@index([courierId, status])
@@ -826,15 +827,15 @@ enum OfferStatus {
 }
 
 model DeliveryOffer {
-  id         String      @id @default(cuid())
-  deliveryId String
-  delivery   Delivery    @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
-  courierId  String
-  courier    Courier     @relation(fields: [courierId], references: [id], onDelete: Cascade)
-  status     OfferStatus @default(OFFERED)
-  expiresAt  DateTime
+  id          String      @id @default(cuid())
+  deliveryId  String
+  delivery    Delivery    @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  courierId   String
+  courier     Courier     @relation(fields: [courierId], references: [id], onDelete: Cascade)
+  status      OfferStatus @default(OFFERED)
+  expiresAt   DateTime
   respondedAt DateTime?
-  createdAt  DateTime    @default(now())
+  createdAt   DateTime    @default(now())
 
   @@unique([deliveryId, courierId])
   @@index([courierId, status])

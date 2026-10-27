@@ -7,7 +7,6 @@ import { requirePartner, requireUser, PARTNER_COOKIE } from "@/server/guards";
 import { runAction, str, optStr, bool, int, file, type ActionResult } from "@/server/action";
 import { AppError } from "@/server/errors";
 import { parseMoneyToCents } from "@/lib/money";
-import { timeToMinutes } from "@/lib/utils";
 import { zonedToUtc } from "@/lib/hours";
 import { destroySession } from "@/server/auth/session";
 import { db } from "@/server/db";
@@ -21,6 +20,7 @@ import { saveCoupon, setCouponActive } from "@/server/services/marketing";
 import { replyToReview } from "@/server/services/customer";
 import { storePublicImage, storePrivateDocument } from "@/server/storage/files";
 import { getSettingsUncached } from "@/server/services/settings";
+import { productInputFromForm, hoursFromForm } from "@/server/forms";
 
 export async function partnerLogoutAction() {
   await destroySession();
@@ -112,29 +112,10 @@ export async function productAction(_: ActionResult, fd: FormData): Promise<Acti
   let createdId: string | null = null;
   const productId = optStr(fd, "id");
   const r = await runAction(async () => {
-    const price = parseMoneyToCents(str(fd, "price"));
-    if (price == null || price < 0) throw new AppError("VALIDATION", "Indique um preço válido.");
-    let groups: unknown = [];
-    try {
-      groups = JSON.parse(str(fd, "optionGroups") || "[]");
-    } catch {
-      throw new AppError("VALIDATION", "Opções inválidas.");
-    }
-    const from = optStr(fd, "availableFrom");
-    const until = optStr(fd, "availableUntil");
+    const input = productInputFromForm(fd);
     const img = file(fd, "image");
     const stored = img ? await storePublicImage(ctx.user.id, img, "product_image", 1200) : null;
-    const p = await saveProduct(ctx.user.id, ctx.restaurantId, productId, {
-      name: str(fd, "name"),
-      description: optStr(fd, "description"),
-      priceCents: price,
-      categoryId: optStr(fd, "categoryId"),
-      status: bool(fd, "paused") ? "PAUSED" : "ACTIVE",
-      isFeatured: bool(fd, "isFeatured"),
-      availableFrom: from ? timeToMinutes(from) : null,
-      availableUntil: until ? timeToMinutes(until) : null,
-      optionGroups: groups,
-    }, stored ? stored.id : bool(fd, "removeImage") ? null : undefined);
+    const p = await saveProduct(ctx.user.id, ctx.restaurantId, productId, input, stored ? stored.id : bool(fd, "removeImage") ? null : undefined);
     createdId = p.id;
     revalidatePath("/parceiro", "layout");
   }, "Produto guardado.");
@@ -204,18 +185,7 @@ export async function documentAction(_: ActionResult, fd: FormData): Promise<Act
 export async function hoursAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const ctx = await requirePartner("store.manage");
   return runAction(async () => {
-    const hours: { dayOfWeek: number; opensAt: number; closesAt: number }[] = [];
-    for (let d = 0; d < 7; d++) {
-      const opens = fd.getAll(`opens-${d}`).map(String);
-      const closes = fd.getAll(`closes-${d}`).map(String);
-      opens.forEach((o, i) => {
-        if (!o && !closes[i]) return;
-        const a = timeToMinutes(o);
-        const b = timeToMinutes(closes[i] ?? "");
-        if (a == null || b == null) throw new AppError("VALIDATION", "Horário inválido. Use o formato HH:MM.");
-        hours.push({ dayOfWeek: d, opensAt: a, closesAt: b });
-      });
-    }
+    const hours = hoursFromForm(fd);
     await setHours(ctx.user.id, ctx.restaurantId, hours);
     revalidatePath("/parceiro", "layout");
   }, "Horário guardado.");

@@ -18,6 +18,7 @@ export type ProductInitial = {
   isFeatured: boolean;
   availableFrom: string;
   availableUntil: string;
+  prepTimeMinutes?: string;
   imageUrl: string | null;
   groups: Group[];
 };
@@ -28,7 +29,17 @@ function toCents(v: string) {
 }
 
 /** Editor de produto com variantes (escolha obrigatória) e complementos (opcionais). */
-export function ProductEditor({ action, categories, initial, currency }: { action: FormAction; categories: { id: string; name: string }[]; initial?: ProductInitial; currency: string }) {
+export function ProductEditor({ action, categories, initial, currency, restaurants, restaurantId }: {
+  action: FormAction;
+  /** Com `restaurants` (Admin), cada categoria indica o seu restaurante e a lista é filtrada pelo restaurante escolhido. */
+  categories: { id: string; name: string; restaurantId?: string }[];
+  initial?: ProductInitial;
+  currency: string;
+  restaurants?: { id: string; name: string }[];
+  restaurantId?: string;
+}) {
+  const [rid, setRid] = useState(restaurantId ?? "");
+  const visibleCategories = restaurants ? categories.filter((c) => c.restaurantId === rid) : categories;
   const [groups, setGroups] = useState<Group[]>(initial?.groups ?? []);
   const [preview, setPreview] = useState<string | null>(initial?.imageUrl ?? null);
 
@@ -50,15 +61,26 @@ export function ProductEditor({ action, categories, initial, currency }: { actio
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <input type="hidden" name="optionGroups" value={serialized} />
       <section className="grid gap-4 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-2 sm:p-5">
+        {restaurants && (
+          <Field label="Restaurante" htmlFor="restaurantId" className="sm:col-span-2" hint={initial ? "O restaurante de um produto existente não pode ser alterado." : undefined}>
+            <Select id="restaurantId" name="restaurantId" value={rid} onChange={(e) => setRid(e.target.value)} required disabled={!!initial}>
+              <option value="">Escolha o restaurante</option>
+              {restaurants.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </Select>
+            {initial && <input type="hidden" name="restaurantId" value={rid} />}
+          </Field>
+        )}
         <Field label="Nome do produto" htmlFor="name" className="sm:col-span-2"><Input id="name" name="name" defaultValue={initial?.name} required minLength={2} maxLength={120} /></Field>
         <Field label="Descrição" htmlFor="description" className="sm:col-span-2"><Textarea id="description" name="description" defaultValue={initial?.description ?? ""} maxLength={1000} /></Field>
         <Field label={`Preço (${currency})`} htmlFor="price"><Input id="price" name="price" inputMode="decimal" defaultValue={initial?.price} required placeholder="0,00" /></Field>
         <Field label="Categoria" htmlFor="categoryId">
-          <Select id="categoryId" name="categoryId" defaultValue={initial?.categoryId ?? ""}>
+          <Select key={rid} id="categoryId" name="categoryId" defaultValue={initial?.categoryId ?? ""}>
             <option value="">Sem categoria</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {visibleCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </Field>
+        <Field label="Tempo de preparação (minutos)" htmlFor="prepTimeMinutes" hint="Opcional"><Input id="prepTimeMinutes" name="prepTimeMinutes" type="number" min={1} max={240} defaultValue={initial?.prepTimeMinutes} /></Field>
+        <div className="hidden sm:block" />
         <Field label="Disponível a partir de" htmlFor="availableFrom" hint="Opcional (ex.: pequeno-almoço)"><Input id="availableFrom" name="availableFrom" type="time" defaultValue={initial?.availableFrom} /></Field>
         <Field label="Disponível até" htmlFor="availableUntil"><Input id="availableUntil" name="availableUntil" type="time" defaultValue={initial?.availableUntil} /></Field>
         <Field label="Fotografia (JPG, PNG ou WebP, até 8 MB)" htmlFor="image" className="sm:col-span-2">

@@ -23,7 +23,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     if (!p || p.restaurantId !== ctx.restaurantId) notFound();
     initial = {
       id: p.id, name: p.name, description: p.description, price: centsToInput(p.priceCents), categoryId: p.categoryId, paused: p.status === "PAUSED", isFeatured: p.isFeatured,
-      availableFrom: p.availableFrom != null ? minutesToTime(p.availableFrom) : "", availableUntil: p.availableUntil != null ? minutesToTime(p.availableUntil) : "",
+      availableFrom: p.availableFrom != null ? minutesToTime(p.availableFrom) : "", availableUntil: p.availableUntil != null ? minutesToTime(p.availableUntil) : "", prepTimeMinutes: p.prepTimeMinutes?.toString() ?? "",
       imageUrl: fileUrl(p.imageFileId),
       groups: p.optionGroups.map((g) => ({ name: g.name, minSelect: g.minSelect, maxSelect: g.maxSelect, options: g.options.map((o) => ({ name: o.name, price: centsToInput(o.priceDeltaCents), isAvailable: o.isAvailable })) })),
     };

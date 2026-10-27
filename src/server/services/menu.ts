@@ -65,6 +65,7 @@ export const productSchema = z.object({
   isFeatured: z.boolean().default(false),
   availableFrom: z.number().int().min(0).max(1439).nullable().optional(),
   availableUntil: z.number().int().min(0).max(1439).nullable().optional(),
+  prepTimeMinutes: z.number().int().min(1, "Tempo de preparação inválido.").max(240, "Tempo de preparação inválido.").nullable().optional(),
   optionGroups: z.array(groupSchema).max(15).default([]),
 });
 
@@ -101,6 +102,7 @@ export async function saveProduct(userId: string, restaurantId: string, productI
     isFeatured: input.isFeatured,
     availableFrom: input.availableFrom ?? null,
     availableUntil: input.availableUntil ?? null,
+    ...(input.prepTimeMinutes !== undefined ? { prepTimeMinutes: input.prepTimeMinutes } : {}),
     ...(imageFileId !== undefined ? { imageFileId } : {}),
   };
   return db.$transaction(async (tx) => {
@@ -159,4 +161,12 @@ export async function setOptionAvailability(userId: string, restaurantId: string
   const o = await db.option.findUnique({ where: { id: optionId }, include: { group: { include: { product: true } } } });
   if (!o || o.group.product.restaurantId !== restaurantId) throw new AppError("NOT_FOUND", "Opção não encontrada.");
   await db.option.update({ where: { id: optionId }, data: { isAvailable } });
+}
+
+/** Alteração rápida de preço (os pedidos antigos guardam o preço no momento da compra). */
+export async function setProductPrice(userId: string, restaurantId: string, productId: string, priceCents: number) {
+  await assertRestaurantAccess(userId, restaurantId, "menu.manage");
+  if (!Number.isInteger(priceCents) || priceCents < 0 || priceCents > 10_000_000) throw new AppError("VALIDATION", "Preço inválido.");
+  const res = await db.product.updateMany({ where: { id: productId, restaurantId }, data: { priceCents } });
+  if (!res.count) throw new AppError("NOT_FOUND", "Produto não encontrado.");
 }

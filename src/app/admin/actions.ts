@@ -12,7 +12,8 @@ import {
   setUserStatus, upsertStaff, setStaffActive, updateSettings, setPlatformLogo, completeSetup, saveCity, addNeighborhoods,
   setNeighborhoodActive, saveCuisine, updateProviderConfig, createCommissionRule, setCourierStatus,
 } from "@/server/services/admin";
-import { setRestaurantStatus, adminUpdateRestaurantCommercial, adminCreateRestaurant } from "@/server/services/restaurants";
+import { setRestaurantStatus, adminUpdateRestaurantCommercial, adminCreateRestaurant, setStoreImage } from "@/server/services/restaurants";
+import { optCoord } from "@/server/forms";
 import { transitionOrder } from "@/server/services/orders";
 import { requestRefund, processRefund, refreshPaymentStatus } from "@/server/services/payments";
 import { adminAssignCourier, dispatchDelivery } from "@/server/services/deliveries";
@@ -86,7 +87,13 @@ export async function createRestaurantAction(_: ActionResult, fd: FormData): Pro
       name: str(fd, "name"), responsibleName: str(fd, "responsibleName"), phone: str(fd, "phone"), email: str(fd, "email"),
       cityId: str(fd, "cityId"), neighborhoodId: optStr(fd, "neighborhoodId"), addressLine: str(fd, "addressLine"),
       addressReference: optStr(fd, "addressReference"), legalName: optStr(fd, "legalName"), nuit: optStr(fd, "nuit"),
+      description: optStr(fd, "description"), latitude: optCoord(fd, "latitude"), longitude: optCoord(fd, "longitude"),
+      acceptingOrders: !bool(fd, "paused"),
     }, owner);
+    const logo = file(fd, "logo");
+    if (logo) await setStoreImage(admin.id, created.id, "logo", (await storePublicImage(admin.id, logo, "restaurant_logo", 512)).id);
+    const cover = file(fd, "cover");
+    if (cover) await setStoreImage(admin.id, created.id, "cover", (await storePublicImage(admin.id, cover, "restaurant_cover", 1600)).id);
     id = created.id;
   });
   if (r?.ok && id) redirect(`/admin/restaurantes/${id}?criado=1`);
@@ -195,7 +202,7 @@ export async function createSettlementAction(_: ActionResult, fd: FormData): Pro
   return runAction(async () => {
     const end = str(fd, "periodEnd");
     await createSettlement(admin.id, str(fd, "restaurantId"), end ? new Date(`${end}T23:59:59`) : new Date(), optStr(fd, "notes"));
-    revalidatePath("/admin/financeiro");
+    revalidatePath("/admin", "layout");
   }, "Liquidação criada.");
 }
 
@@ -203,7 +210,7 @@ export async function settlementPaidAction(_: ActionResult, fd: FormData): Promi
   const admin = await requireAdmin("finance.manage");
   return runAction(async () => {
     await markSettlementPaid(admin.id, str(fd, "id"), str(fd, "reference"));
-    revalidatePath("/admin/financeiro");
+    revalidatePath("/admin", "layout");
   }, "Liquidação marcada como paga.");
 }
 
@@ -211,7 +218,7 @@ export async function settlementCancelAction(_: ActionResult, fd: FormData): Pro
   const admin = await requireAdmin("finance.manage");
   return runAction(async () => {
     await cancelSettlement(admin.id, str(fd, "id"));
-    revalidatePath("/admin/financeiro");
+    revalidatePath("/admin", "layout");
   }, "Liquidação anulada.");
 }
 
@@ -219,7 +226,7 @@ export async function courierPayoutAction(_: ActionResult, fd: FormData): Promis
   const admin = await requireAdmin("finance.manage");
   return runAction(async () => {
     await createCourierPayout(admin.id, str(fd, "courierId"), str(fd, "reference"));
-    revalidatePath("/admin/financeiro");
+    revalidatePath("/admin", "layout");
     revalidatePath("/admin/entregadores", "layout");
   }, "Pagamento ao entregador registado.");
 }
@@ -284,7 +291,7 @@ export async function campaignAction(_: ActionResult, fd: FormData): Promise<Act
       name: str(fd, "name"), description: optStr(fd, "description"), cityId: optStr(fd, "cityId"), restaurantId: optStr(fd, "restaurantId"),
       startsAt: await date(fd, "startsAt"), endsAt: await date(fd, "endsAt"), isActive: bool(fd, "isActive"),
     });
-    revalidatePath("/admin/promocoes");
+    revalidatePath("/admin", "layout");
   }, "Campanha guardada.");
 }
 
@@ -298,7 +305,7 @@ export async function bannerAction(_: ActionResult, fd: FormData): Promise<Actio
       position: int(fd, "position"), isActive: bool(fd, "isActive"), startsAt: await date(fd, "startsAt"), endsAt: await date(fd, "endsAt"),
       imageFileId: stored ? stored.id : bool(fd, "removeImage") ? null : undefined,
     });
-    revalidatePath("/admin/promocoes");
+    revalidatePath("/admin", "layout");
     revalidatePath("/");
   }, "Banner guardado.");
 }
@@ -307,7 +314,7 @@ export async function deleteBannerAction(_: ActionResult, fd: FormData): Promise
   const admin = await requireAdmin("marketing.manage");
   return runAction(async () => {
     await deleteBanner(admin.id, str(fd, "id"));
-    revalidatePath("/admin/promocoes");
+    revalidatePath("/admin", "layout");
   }, "Banner removido.");
 }
 
@@ -447,4 +454,199 @@ export async function assignOwnerAction(_: ActionResult, fd: FormData): Promise<
     await adminAddRestaurantOwner(admin.id, str(fd, "id"), str(fd, "email"));
     revalidatePath(`/admin/restaurantes/${str(fd, "id")}`);
   }, "Proprietário associado.");
+}
+
+// ─────────────── Login administrativo ───────────────
+
+/**
+ * Login exclusivo da área administrativa. Contas sem funções administrativas são recusadas
+ * sem criar sessão, para que o painel nunca fique acessível a clientes.
+ */
+export async function adminLoginAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  let target = "/admin";
+  const r = await runAction(async () => {
+    const { requestInfo } = await import("@/server/request");
+    const { authenticate } = await import("@/server/services/accounts");
+    const { createSession } = await import("@/server/auth/session");
+    const { isAdminUser } = await import("@/server/permissions");
+    const { ip } = await requestInfo();
+    const user = await authenticate(str(fd, "email"), String(fd.get("password") ?? ""), ip);
+    const full = await db.user.findUniqueOrThrow({ where: { id: user.id }, include: { staff: true } });
+    if (!isAdminUser(full)) throw new AppError("FORBIDDEN", "Esta conta não tem permissões administrativas.");
+    await createSession(user.id);
+    const next = optStr(fd, "next");
+    if (next && /^\/admin(\/|$|\?)/.test(next) && !next.startsWith("/admin/login")) target = next;
+  });
+  if (r?.ok) redirect(target);
+  return r;
+}
+
+// ─────────────── Gestão comercial: restaurantes, produtos e categorias ───────────────
+// Estas ações usam os mesmos serviços do painel do restaurante. A autorização é verificada nos serviços:
+// a equipa com "restaurants.manage" pode gerir o cardápio e a loja de qualquer restaurante.
+
+/** Restaurante a que um produto pertence (nunca confiar no restaurantId enviado pelo navegador para produtos existentes). */
+async function productRestaurant(productId: string) {
+  const p = await db.product.findUnique({ where: { id: productId }, select: { restaurantId: true } });
+  if (!p) throw new AppError("NOT_FOUND", "Produto não encontrado.");
+  return p.restaurantId;
+}
+
+export async function adminRestaurantUpdateAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { adminUpdateRestaurant, setStoreImage } = await import("@/server/services/restaurants");
+    const { optCoord } = await import("@/server/forms");
+    const id = str(fd, "id");
+    await adminUpdateRestaurant(admin.id, id, {
+      name: str(fd, "name"), responsibleName: str(fd, "responsibleName"), phone: str(fd, "phone"), email: optStr(fd, "email"),
+      description: optStr(fd, "description"), cityId: str(fd, "cityId"), neighborhoodId: optStr(fd, "neighborhoodId"),
+      addressLine: str(fd, "addressLine"), addressReference: optStr(fd, "addressReference"), legalName: optStr(fd, "legalName"), nuit: optStr(fd, "nuit"),
+      latitude: optCoord(fd, "latitude"), longitude: optCoord(fd, "longitude"),
+      prepTimeMinutes: int(fd, "prepTimeMinutes", 30), minOrderCents: money(fd, "minOrder", false) ?? 0, acceptsCashOnDelivery: bool(fd, "acceptsCashOnDelivery"),
+    });
+    const logo = file(fd, "logo");
+    if (logo) await setStoreImage(admin.id, id, "logo", (await storePublicImage(admin.id, logo, "restaurant_logo", 512)).id);
+    const cover = file(fd, "cover");
+    if (cover) await setStoreImage(admin.id, id, "cover", (await storePublicImage(admin.id, cover, "restaurant_cover", 1600)).id);
+    revalidatePath("/", "layout");
+  }, "Restaurante guardado.");
+}
+
+export async function adminRestaurantPauseAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { adminSetAcceptingOrders } = await import("@/server/services/restaurants");
+    const accepting = bool(fd, "accepting");
+    await adminSetAcceptingOrders(admin.id, str(fd, "id"), accepting);
+    revalidatePath("/", "layout");
+    return { ok: true, message: accepting ? "Loja ativada: volta a receber pedidos." : "Loja pausada: não recebe pedidos." };
+  });
+}
+
+export async function adminHoursAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { setHours } = await import("@/server/services/restaurants");
+    const { hoursFromForm } = await import("@/server/forms");
+    await setHours(admin.id, str(fd, "restaurantId"), hoursFromForm(fd));
+    revalidatePath("/", "layout");
+  }, "Horário guardado.");
+}
+
+export async function adminZoneAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { upsertZone } = await import("@/server/services/restaurants");
+    const fee = money(fd, "fee", false);
+    if (fee == null) throw new AppError("VALIDATION", "Indique a taxa de entrega (0 para grátis).");
+    await upsertZone(admin.id, str(fd, "restaurantId"), { neighborhoodId: str(fd, "neighborhoodId"), feeCents: fee, etaMinutes: int(fd, "etaMinutes", 30), isActive: fd.has("isActive") ? bool(fd, "isActive") : true });
+    revalidatePath("/", "layout");
+  }, "Zona de entrega guardada.");
+}
+
+export async function adminZoneDeleteAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { deleteZone } = await import("@/server/services/restaurants");
+    await deleteZone(admin.id, str(fd, "restaurantId"), str(fd, "id"));
+    revalidatePath("/", "layout");
+  }, "Zona removida.");
+}
+
+export async function adminProductAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  const productId = optStr(fd, "id");
+  let createdId: string | null = null;
+  const r = await runAction(async () => {
+    const { saveProduct } = await import("@/server/services/menu");
+    const { productInputFromForm } = await import("@/server/forms");
+    const restaurantId = productId ? await productRestaurant(productId) : str(fd, "restaurantId");
+    if (!restaurantId) throw new AppError("VALIDATION", "Escolha o restaurante.");
+    const input = productInputFromForm(fd);
+    const img = file(fd, "image");
+    const stored = img ? await storePublicImage(admin.id, img, "product_image", 1200) : null;
+    const p = await saveProduct(admin.id, restaurantId, productId, input, stored ? stored.id : bool(fd, "removeImage") ? null : undefined);
+    createdId = p.id;
+    revalidatePath("/", "layout");
+  }, "Produto guardado.");
+  if (r?.ok && !productId && createdId) redirect(`/admin/produtos?guardado=${createdId}`);
+  return r;
+}
+
+export async function adminProductStatusAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { setProductStatus } = await import("@/server/services/menu");
+    const id = str(fd, "id");
+    const status = str(fd, "status");
+    if (status !== "ACTIVE" && status !== "PAUSED" && status !== "ARCHIVED") throw new AppError("VALIDATION", "Estado inválido.");
+    await setProductStatus(admin.id, await productRestaurant(id), id, status);
+    revalidatePath("/", "layout");
+    return { ok: true, message: { ACTIVE: "Produto ativado.", PAUSED: "Produto desativado.", ARCHIVED: "Produto arquivado." }[status] };
+  });
+}
+
+export async function adminProductPriceAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { setProductPrice } = await import("@/server/services/menu");
+    const id = str(fd, "id");
+    await setProductPrice(admin.id, await productRestaurant(id), id, money(fd, "price")!);
+    revalidatePath("/", "layout");
+  }, "Preço atualizado.");
+}
+
+export async function adminProductDeleteAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { deleteProduct } = await import("@/server/services/menu");
+    const id = str(fd, "id");
+    const res = await deleteProduct(admin.id, await productRestaurant(id), id);
+    revalidatePath("/", "layout");
+    return { ok: true, message: res.archived ? "O produto tem pedidos associados e foi arquivado (o histórico mantém-se)." : "Produto eliminado." };
+  });
+}
+
+export async function adminCategoryAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { saveMenuCategory } = await import("@/server/services/menu");
+    const id = optStr(fd, "id");
+    let restaurantId = str(fd, "restaurantId");
+    if (id) {
+      const c = await db.menuCategory.findUnique({ where: { id }, select: { restaurantId: true } });
+      if (!c) throw new AppError("NOT_FOUND", "Categoria não encontrada.");
+      restaurantId = c.restaurantId;
+    }
+    if (!restaurantId) throw new AppError("VALIDATION", "Escolha o restaurante.");
+    await saveMenuCategory(admin.id, restaurantId, { id, name: str(fd, "name"), description: optStr(fd, "description"), isActive: fd.has("isActive") ? bool(fd, "isActive") : true });
+    revalidatePath("/", "layout");
+  }, "Categoria guardada.");
+}
+
+async function categoryRestaurant(id: string) {
+  const c = await db.menuCategory.findUnique({ where: { id }, select: { restaurantId: true } });
+  if (!c) throw new AppError("NOT_FOUND", "Categoria não encontrada.");
+  return c.restaurantId;
+}
+
+export async function adminCategoryDeleteAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { deleteMenuCategory } = await import("@/server/services/menu");
+    const id = str(fd, "id");
+    await deleteMenuCategory(admin.id, await categoryRestaurant(id), id);
+    revalidatePath("/", "layout");
+  }, "Categoria eliminada. Os produtos ficaram sem categoria.");
+}
+
+export async function adminCategoryMoveAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { moveMenuCategory } = await import("@/server/services/menu");
+    const id = str(fd, "id");
+    await moveMenuCategory(admin.id, await categoryRestaurant(id), id, str(fd, "dir") === "up" ? -1 : 1);
+    revalidatePath("/", "layout");
+  });
 }

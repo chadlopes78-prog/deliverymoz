@@ -7,6 +7,10 @@ import { shortCode } from "../auth/tokens";
 import { rateLimit } from "../rate-limit";
 import { notifyUsers, adminUserIds } from "./notifications";
 
+/** Categorias tratadas como reclamações; as restantes (conta, outro) são pedidos de ajuda. */
+export const COMPLAINT_CATEGORIES: TicketCategory[] = ["ORDER", "PAYMENT", "DELIVERY", "PRODUCT", "REFUND", "RESTAURANT"];
+export const HELP_CATEGORIES: TicketCategory[] = ["ACCOUNT", "OTHER"];
+
 export const TICKET_CATEGORY_LABEL: Record<TicketCategory, string> = {
   ORDER: "Pedido",
   PAYMENT: "Pagamento",

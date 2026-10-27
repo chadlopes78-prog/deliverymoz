@@ -32,12 +32,15 @@ async function afterLogin(userId: string) {
 }
 
 export async function loginAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  let target = safeNext(optStr(fd, "next"));
   const result = await runAction(async () => {
     const { ip } = await requestInfo();
     const user = await authenticate(str(fd, "identifier"), String(fd.get("password") ?? ""), ip);
     await afterLogin(user.id);
+    // Sem destino explícito, administradores vão para o painel e não para a página pública.
+    if (target === "/" && (user.isSuperAdmin || (await db.staffMember.findFirst({ where: { userId: user.id, isActive: true } })))) target = "/admin";
   });
-  if (result?.ok) redirect(safeNext(optStr(fd, "next")));
+  if (result?.ok) redirect(target);
   return result;
 }
 

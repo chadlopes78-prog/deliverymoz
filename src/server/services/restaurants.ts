@@ -48,6 +48,11 @@ export async function applyAsPartner(userId: string, raw: unknown) {
     const nb = await db.neighborhood.findUnique({ where: { id: input.neighborhoodId } });
     if (!nb || nb.cityId !== city.id) throw new AppError("VALIDATION", "Bairro inválido.");
   }
+  // Submissão repetida (duplo clique, recarregar a página): devolve a candidatura pendente já existente.
+  const duplicate = await db.restaurant.findFirst({
+    where: { status: "PENDING", name: { equals: input.name, mode: "insensitive" }, members: { some: { userId, role: "OWNER" } } },
+  });
+  if (duplicate) return duplicate;
   const pendingOwned = await db.restaurantMember.count({ where: { userId, role: "OWNER", restaurant: { status: "PENDING" } } });
   if (pendingOwned >= 3) throw new AppError("CONFLICT", "Já tem candidaturas pendentes. Aguarde a análise.");
 
@@ -81,6 +86,17 @@ export async function applyAsPartner(userId: string, raw: unknown) {
   return restaurant;
 }
 
+const geo = {
+  latitude: z.number().min(-90, "Latitude inválida.").max(90, "Latitude inválida.").nullable().optional(),
+  longitude: z.number().min(-180, "Longitude inválida.").max(180, "Longitude inválida.").nullable().optional(),
+};
+
+export const adminRestaurantCreateSchema = partnerApplicationSchema.extend({
+  description: z.string().trim().max(1000).optional().nullable(),
+  acceptingOrders: z.boolean().optional(),
+  ...geo,
+});
+
 /** Super Admin / gestão de restaurantes: cria diretamente um restaurante e (opcionalmente) a conta do proprietário. */
 export async function adminCreateRestaurant(
   adminId: string,
@@ -88,11 +104,15 @@ export async function adminCreateRestaurant(
   owner: { mode: "existing"; email: string } | { mode: "new"; name: string; email: string; phone: string; password: string } | { mode: "none" },
 ) {
   await assertAdmin(adminId, "restaurants.manage");
-  const input = partnerApplicationSchema.parse(raw);
+  const input = adminRestaurantCreateSchema.parse(raw);
   const phone = normalizeMzPhone(input.phone);
   if (!phone) throw new AppError("VALIDATION", "Telefone inválido.");
   const city = await db.city.findUnique({ where: { id: input.cityId } });
   if (!city) throw new AppError("VALIDATION", "Cidade inválida.");
+  if (input.neighborhoodId) {
+    const nb = await db.neighborhood.findUnique({ where: { id: input.neighborhoodId } });
+    if (!nb || nb.cityId !== city.id) throw new AppError("VALIDATION", "Bairro inválido.");
+  }
 
   let ownerId: string | null = null;
   if (owner.mode === "existing") {
@@ -129,6 +149,10 @@ export async function adminCreateRestaurant(
       nuit: input.nuit || null,
       businessInfo: input.businessInfo || null,
       payoutDetails: input.payoutDetails || null,
+      description: input.description || null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      acceptingOrders: input.acceptingOrders ?? true,
       status: "APPROVED",
       approvedAt: new Date(),
       ...(ownerId ? { members: { create: { userId: ownerId, role: "OWNER" as RestaurantRole } } } : {}),
@@ -181,6 +205,74 @@ export async function adminUpdateRestaurantCommercial(
   if (deliveryMode === "RESTAURANT" && !input.allowRestaurantDelivery) deliveryMode = "PLATFORM";
   await db.restaurant.update({ where: { id: restaurantId }, data: { ...input, deliveryMode } });
   await audit({ actorId: adminId, action: "restaurant.commercial_update", entityType: "Restaurant", entityId: restaurantId, metadata: input });
+}
+
+export const adminRestaurantUpdateSchema = z.object({
+  name: z.string().trim().min(2, "Indique o nome comercial.").max(120),
+  responsibleName: z.string().trim().min(2, "Indique o nome do responsável.").max(120),
+  phone: z.string().trim().min(9, "Telefone inválido.").max(20),
+  email: z.string().trim().toLowerCase().email("E-mail inválido.").max(200).optional().nullable().or(z.literal("")),
+  description: z.string().trim().max(1000).optional().nullable(),
+  cityId: z.string().min(1, "Escolha a cidade."),
+  neighborhoodId: z.string().optional().nullable(),
+  addressLine: z.string().trim().min(3, "Indique o endereço.").max(200),
+  addressReference: z.string().trim().max(300).optional().nullable(),
+  legalName: z.string().trim().max(200).optional().nullable(),
+  nuit: z.string().trim().max(20).optional().nullable(),
+  prepTimeMinutes: z.number().int().min(5).max(240),
+  minOrderCents: z.number().int().min(0).max(100_000_00),
+  acceptsCashOnDelivery: z.boolean(),
+  ...geo,
+});
+
+/** Edição completa dos dados de um restaurante pelo Admin (inclui responsável e cidade). */
+export async function adminUpdateRestaurant(adminId: string, restaurantId: string, raw: unknown) {
+  await assertAdmin(adminId, "restaurants.manage");
+  const input = adminRestaurantUpdateSchema.parse(raw);
+  const r = await db.restaurant.findUnique({ where: { id: restaurantId } });
+  if (!r) throw new AppError("NOT_FOUND", "Restaurante não encontrado.");
+  const phone = normalizeMzPhone(input.phone);
+  if (!phone) throw new AppError("VALIDATION", "Telefone inválido.");
+  const city = await db.city.findUnique({ where: { id: input.cityId } });
+  if (!city) throw new AppError("VALIDATION", "Cidade inválida.");
+  if (input.neighborhoodId) {
+    const nb = await db.neighborhood.findUnique({ where: { id: input.neighborhoodId } });
+    if (!nb || nb.cityId !== city.id) throw new AppError("VALIDATION", "Bairro inválido.");
+  }
+  await db.$transaction(async (tx) => {
+    await tx.restaurant.update({
+      where: { id: restaurantId },
+      data: {
+        name: input.name,
+        responsibleName: input.responsibleName,
+        phone,
+        email: input.email || null,
+        description: input.description || null,
+        cityId: city.id,
+        neighborhoodId: input.neighborhoodId || null,
+        addressLine: input.addressLine,
+        addressReference: input.addressReference || null,
+        legalName: input.legalName || null,
+        nuit: input.nuit || null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        prepTimeMinutes: input.prepTimeMinutes,
+        minOrderCents: input.minOrderCents,
+        acceptsCashOnDelivery: input.acceptsCashOnDelivery,
+      },
+    });
+    // As zonas de entrega pertencem a bairros da cidade: ao mudar de cidade deixam de ser válidas.
+    if (city.id !== r.cityId) await tx.deliveryZone.deleteMany({ where: { restaurantId } });
+  });
+  await audit({ actorId: adminId, action: "restaurant.admin_update", entityType: "Restaurant", entityId: restaurantId });
+}
+
+/** Pausa ou retoma a receção de pedidos a partir do Admin. */
+export async function adminSetAcceptingOrders(adminId: string, restaurantId: string, accepting: boolean) {
+  await assertAdmin(adminId, "restaurants.manage");
+  const res = await db.restaurant.updateMany({ where: { id: restaurantId }, data: { acceptingOrders: accepting } });
+  if (!res.count) throw new AppError("NOT_FOUND", "Restaurante não encontrado.");
+  await audit({ actorId: adminId, action: accepting ? "restaurant.resume" : "restaurant.pause", entityType: "Restaurant", entityId: restaurantId });
 }
 
 // ─────────────────────────── Gestão da loja (parceiro) ───────────────────────────

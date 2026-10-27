@@ -1,5 +1,5 @@
 import "server-only";
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getSessionUser, type SessionUser } from "./auth/session";
 import { hasAdminPermission, hasRestaurantPermission, isAdminUser, type AdminPermission, type RestaurantPermission } from "./permissions";
@@ -11,9 +11,13 @@ export async function requireUser(next = "/"): Promise<SessionUser> {
   return user;
 }
 
+/**
+ * Área administrativa: sem sessão → login administrativo; sessão sem funções administrativas → acesso recusado.
+ */
 export async function requireAdmin(permission: AdminPermission = "dashboard.view"): Promise<SessionUser> {
-  const user = await requireUser("/admin");
-  if (!isAdminUser(user)) notFound();
+  const user = await getSessionUser();
+  if (!user) redirect("/admin/login");
+  if (!isAdminUser(user)) redirect("/admin/sem-acesso");
   if (!hasAdminPermission(user, permission)) redirect("/admin?sem-permissao=1");
   return user;
 }

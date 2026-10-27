@@ -26,6 +26,8 @@ export async function assertAdmin(userId: string, permission: AdminPermission) {
   return user;
 }
 
+const ADMIN_OVERRIDE: RestaurantPermission[] = ["menu.manage", "store.manage"];
+
 /**
  * Verifica, sempre na base de dados, que o utilizador pertence ao restaurante
  * com a permissão pedida. Nunca confiar num restaurantId vindo do navegador sem esta verificação.
@@ -35,7 +37,14 @@ export async function assertRestaurantAccess(
   restaurantId: string,
   permission: RestaurantPermission,
 ): Promise<{ role: RestaurantRole; restaurant: { id: string; status: string; name: string } }> {
-  await loadActiveUser(userId);
+  const user = await loadActiveUser(userId);
+  // A equipa com "restaurants.manage" pode gerir o cardápio e a loja de qualquer restaurante a partir do Admin.
+  // Pedidos, pagamentos, equipa e dados de liquidação continuam reservados aos membros do restaurante.
+  if (ADMIN_OVERRIDE.includes(permission) && hasAdminPermission(user, "restaurants.manage")) {
+    const restaurant = await db.restaurant.findUnique({ where: { id: restaurantId }, select: { id: true, status: true, name: true } });
+    if (!restaurant) throw new AppError("NOT_FOUND", "Restaurante não encontrado.");
+    return { role: "MANAGER", restaurant };
+  }
   const member = await db.restaurantMember.findUnique({
     where: { restaurantId_userId: { restaurantId, userId } },
     include: { restaurant: { select: { id: true, status: true, name: true } } },
