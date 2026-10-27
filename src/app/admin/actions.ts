@@ -13,7 +13,7 @@ import {
   setNeighborhoodActive, saveCuisine, updateProviderConfig, createCommissionRule, setCourierStatus,
 } from "@/server/services/admin";
 import { setRestaurantStatus, adminUpdateRestaurantCommercial, adminCreateRestaurant, setStoreImage } from "@/server/services/restaurants";
-import { optCoord } from "@/server/forms";
+import { optCoord, hoursFromForm } from "@/server/forms";
 import { transitionOrder } from "@/server/services/orders";
 import { requestRefund, processRefund, refreshPaymentStatus } from "@/server/services/payments";
 import { adminAssignCourier, dispatchDelivery } from "@/server/services/deliveries";
@@ -88,8 +88,8 @@ export async function createRestaurantAction(_: ActionResult, fd: FormData): Pro
       cityId: str(fd, "cityId"), neighborhoodId: optStr(fd, "neighborhoodId"), addressLine: str(fd, "addressLine"),
       addressReference: optStr(fd, "addressReference"), legalName: optStr(fd, "legalName"), nuit: optStr(fd, "nuit"),
       description: optStr(fd, "description"), latitude: optCoord(fd, "latitude"), longitude: optCoord(fd, "longitude"),
-      acceptingOrders: !bool(fd, "paused"),
-    }, owner);
+      acceptingOrders: str(fd, "initialStatus") !== "PAUSED",
+    }, owner, hoursFromForm(fd));
     const logo = file(fd, "logo");
     if (logo) await setStoreImage(admin.id, created.id, "logo", (await storePublicImage(admin.id, logo, "restaurant_logo", 512)).id);
     const cover = file(fd, "cover");

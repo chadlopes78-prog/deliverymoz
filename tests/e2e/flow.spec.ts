@@ -110,6 +110,14 @@ test.describe.serial("fluxo completo", () => {
     await page.getByLabel("Latitude (opcional)").fill("-25.9692");
     await page.getByLabel("Longitude (opcional)").fill("32.5732");
     await page.getByLabel(/Logótipo/).setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: await testImage("#e11d48") });
+    // Horário e estado definidos logo na criação
+    for (const day of ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]) {
+      const box = page.locator("div.rounded-2xl").filter({ has: page.getByText(day, { exact: true }) });
+      await box.getByRole("button", { name: "Turno" }).click();
+      await box.getByLabel(`${day} abre`).fill("00:00");
+      await box.getByLabel(`${day} fecha`).fill("23:59");
+    }
+    await expect(page.getByLabel("Estado do restaurante")).toHaveValue("ACTIVE");
     await page.getByLabel("Conta do proprietário").selectOption("existing");
     await page.getByLabel("E-mail do proprietário").fill(OWNER.email);
     await page.getByRole("button", { name: "Criar restaurante" }).click();
@@ -139,14 +147,9 @@ test.describe.serial("fluxo completo", () => {
     await page.getByLabel(/^Capa/).setInputFiles({ name: "capa.png", mimeType: "image/png", buffer: await testImage("#0ea5e9") });
     await page.getByRole("button", { name: "Guardar restaurante" }).click();
     await expect(page.getByText("Restaurante guardado.")).toBeVisible();
-    for (const day of ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]) {
-      const box = page.locator("form > div").filter({ has: page.getByText(day, { exact: true }) });
-      await box.getByRole("button", { name: "Turno" }).click();
-      await box.getByLabel(`${day} abre`).fill("00:00");
-      await box.getByLabel(`${day} fecha`).fill("23:59");
-    }
-    await page.getByRole("button", { name: "Guardar horário" }).click();
-    await expect(page.getByText("Horário guardado.")).toBeVisible();
+    // O horário definido na criação ficou gravado
+    await expect(page.getByLabel("Segunda abre")).toHaveValue("00:00");
+    await expect(page.getByLabel("Sábado fecha")).toHaveValue("23:59");
     await page.getByLabel("Bairro", { exact: true }).selectOption({ label: "Bairro Um" });
     await page.getByLabel(/Taxa de entrega/).fill("50");
     await page.getByRole("button", { name: "Adicionar zona" }).click();

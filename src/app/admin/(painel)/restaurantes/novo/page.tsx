@@ -3,9 +3,10 @@ import { getGeography } from "@/server/location";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ActionForm } from "@/components/ui/action-form";
-import { Checkbox, Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { GeoFields } from "@/components/admin/geo-fields";
 import { ImageField } from "@/components/admin/image-field";
+import { HoursFields } from "@/components/partner/hours-editor";
 import { SubmitButton } from "@/components/ui/button";
 import { CityNeighborhoodSelect } from "@/components/city-neighborhood";
 import { OwnerFields } from "@/components/admin/owner-fields";
@@ -44,8 +45,17 @@ export default async function NewRestaurant() {
             <CardBody className="grid gap-4 sm:grid-cols-2">
               <ImageField name="logo" label="Logótipo" />
               <ImageField name="cover" label="Capa" wide />
-              <Checkbox name="paused" label="Criar com a loja pausada (não recebe pedidos até ser ativada)" className="sm:col-span-2" />
+              <Field label="Estado do restaurante" htmlFor="initialStatus" className="sm:col-span-2" hint="Pode ser alterado a qualquer momento na lista de restaurantes.">
+                <Select id="initialStatus" name="initialStatus" defaultValue="ACTIVE">
+                  <option value="ACTIVE">Ativo: recebe pedidos assim que tiver horário, zona de entrega e produtos</option>
+                  <option value="PAUSED">Pausado: não recebe pedidos até ser ativado</option>
+                </Select>
+              </Field>
             </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Horário de funcionamento" description="Opcional agora; sem horário o restaurante não é publicado. Pode completá-lo depois em Editar." />
+            <CardBody><HoursFields initial={Array.from({ length: 7 }, () => [])} /></CardBody>
           </Card>
           <Card>
             <CardHeader title="Acesso ao painel do restaurante" />

@@ -102,9 +102,11 @@ export async function adminCreateRestaurant(
   adminId: string,
   raw: unknown,
   owner: { mode: "existing"; email: string } | { mode: "new"; name: string; email: string; phone: string; password: string } | { mode: "none" },
+  hours: Shift[] = [],
 ) {
   await assertAdmin(adminId, "restaurants.manage");
   const input = adminRestaurantCreateSchema.parse(raw);
+  validateHours(hours);
   const phone = normalizeMzPhone(input.phone);
   if (!phone) throw new AppError("VALIDATION", "Telefone inválido.");
   const city = await db.city.findUnique({ where: { id: input.cityId } });
@@ -156,6 +158,7 @@ export async function adminCreateRestaurant(
       status: "APPROVED",
       approvedAt: new Date(),
       ...(ownerId ? { members: { create: { userId: ownerId, role: "OWNER" as RestaurantRole } } } : {}),
+      ...(hours.length ? { hours: { create: hours } } : {}),
     },
   });
   await audit({ actorId: adminId, action: "restaurant.admin_create", entityType: "Restaurant", entityId: restaurant.id, metadata: { ownerMode: owner.mode } });
@@ -345,14 +348,20 @@ export async function setPayoutDetails(userId: string, restaurantId: string, det
   await audit({ actorId: userId, action: "restaurant.payout_update", entityType: "Restaurant", entityId: restaurantId });
 }
 
-export async function setHours(userId: string, restaurantId: string, hours: { dayOfWeek: number; opensAt: number; closesAt: number }[]) {
-  await assertRestaurantAccess(userId, restaurantId, "store.manage");
+type Shift = { dayOfWeek: number; opensAt: number; closesAt: number };
+
+function validateHours(hours: Shift[]) {
   for (const h of hours) {
     if (!Number.isInteger(h.dayOfWeek) || h.dayOfWeek < 0 || h.dayOfWeek > 6) throw new AppError("VALIDATION", "Dia inválido.");
     if (h.opensAt < 0 || h.opensAt >= 1440 || h.closesAt < 0 || h.closesAt >= 1440 || h.opensAt === h.closesAt)
-      throw new AppError("VALIDATION", "Horário inválido.");
+      throw new AppError("VALIDATION", "Horário inválido: a abertura e o fecho não podem ser iguais.");
   }
   if (hours.length > 21) throw new AppError("VALIDATION", "Demasiados turnos.");
+}
+
+export async function setHours(userId: string, restaurantId: string, hours: Shift[]) {
+  await assertRestaurantAccess(userId, restaurantId, "store.manage");
+  validateHours(hours);
   await db.$transaction([
     db.restaurantHour.deleteMany({ where: { restaurantId } }),
     db.restaurantHour.createMany({ data: hours.map((h) => ({ ...h, restaurantId })) }),

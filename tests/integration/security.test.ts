@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { resetDb, makeUser, makeGeo, makeRestaurant, enableProvider } from "../helpers";
 import { registerCustomer, authenticate, requestPasswordReset, resetPassword, createOwner, closeAccount } from "@/server/services/accounts";
 import { saveProduct, deleteProduct, setProductStatus, setProductPrice, saveMenuCategory } from "@/server/services/menu";
-import { updateStore, setRestaurantStatus, applyAsPartner, addRestaurantMember, adminUpdateRestaurant, adminSetAcceptingOrders, setHours, upsertZone, setAcceptingOrders } from "@/server/services/restaurants";
+import { updateStore, setRestaurantStatus, applyAsPartner, addRestaurantMember, adminCreateRestaurant, adminUpdateRestaurant, adminSetAcceptingOrders, setHours, upsertZone, setAcceptingOrders } from "@/server/services/restaurants";
 import { upsertStaff, setUserStatus, updateSettings, setCourierStatus, updateProviderConfig, createCommissionRule } from "@/server/services/admin";
 import { addToCart } from "@/server/services/cart";
 import { placeOrder, transitionOrder, getCustomerOrder } from "@/server/services/orders";
@@ -204,6 +204,21 @@ describe("isolamento e permissões", () => {
     const other = await db.city.create({ data: { name: "Outra", slug: "outra-cidade" } });
     await expect(adminUpdateRestaurant(owner.id, a.restaurant.id, { ...base, cityId: other.id })).rejects.toThrow(/Bairro/);
     await expect(adminUpdateRestaurant(a.restaurant.id, a.restaurant.id, base)).rejects.toThrow();
+  });
+
+  it("admin cria restaurante com horário e estado; horário inválido não cria nada", async () => {
+    const owner = await makeUser({ isSuperAdmin: true });
+    const customer = await makeUser();
+    const geo = await makeGeo();
+    const data = { name: "Casa Nova", responsibleName: "Resp", phone: "841234500", email: "c@n.test", cityId: geo.city.id, neighborhoodId: geo.nb.id, addressLine: "Rua 1", acceptingOrders: false };
+    await expect(adminCreateRestaurant(owner.id, data, { mode: "none" }, [{ dayOfWeek: 1, opensAt: 600, closesAt: 600 }])).rejects.toThrow(/Horário inválido/);
+    expect(await db.restaurant.count()).toBe(0);
+    await expect(adminCreateRestaurant(customer.id, data, { mode: "none" })).rejects.toThrow(/permissão/);
+    const r = await adminCreateRestaurant(owner.id, data, { mode: "none" }, [{ dayOfWeek: 1, opensAt: 600, closesAt: 1320 }]);
+    const saved = await db.restaurant.findUniqueOrThrow({ where: { id: r.id }, include: { hours: true } });
+    expect(saved.status).toBe("APPROVED");
+    expect(saved.acceptingOrders).toBe(false);
+    expect(saved.hours).toHaveLength(1);
   });
 
   it("candidatura repetida de parceiro não cria duplicados", async () => {
