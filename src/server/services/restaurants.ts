@@ -80,7 +80,7 @@ export async function applyAsPartner(userId: string, raw: unknown) {
     type: "RESTAURANT_APPLICATION",
     title: "Nova candidatura de restaurante",
     body: `${restaurant.name} candidatou-se à plataforma.`,
-    link: `/admin/restaurantes/${restaurant.id}`,
+    link: "/admin/aprovacoes",
     email: "order",
   });
   return restaurant;

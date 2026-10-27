@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "@/server/db";
 import { resetDb, makeUser, makeGeo, makeRestaurant, enableProvider } from "../helpers";
 import { registerCustomer, authenticate, requestPasswordReset, resetPassword, createOwner, closeAccount } from "@/server/services/accounts";
-import { saveProduct, deleteProduct, setProductStatus } from "@/server/services/menu";
-import { updateStore, setRestaurantStatus, applyAsPartner, addRestaurantMember } from "@/server/services/restaurants";
+import { saveProduct, deleteProduct, setProductStatus, setProductPrice, saveMenuCategory } from "@/server/services/menu";
+import { updateStore, setRestaurantStatus, applyAsPartner, addRestaurantMember, adminUpdateRestaurant, adminSetAcceptingOrders, setHours, upsertZone, setAcceptingOrders } from "@/server/services/restaurants";
 import { upsertStaff, setUserStatus, updateSettings, setCourierStatus, updateProviderConfig, createCommissionRule } from "@/server/services/admin";
 import { addToCart } from "@/server/services/cart";
 import { placeOrder, transitionOrder, getCustomerOrder } from "@/server/services/orders";
@@ -158,6 +158,62 @@ describe("isolamento e permissões", () => {
     await setRestaurantStatus(admin.id, r.id, "APPROVED");
     expect((await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).status).toBe("APPROVED");
     expect(await db.auditLog.count({ where: { entityId: r.id, action: "restaurant.approved" } })).toBe(1);
+  });
+
+  it("admin gere cardápio e loja de qualquer restaurante; outros funcionários e clientes não", async () => {
+    const { a, geo } = await twoRestaurants();
+    const owner = await makeUser({ isSuperAdmin: true });
+    const manager = await makeUser();
+    const ops = await makeUser();
+    const customer = await makeUser();
+    await upsertStaff(owner.id, { email: manager.email!, role: "RESTAURANT_MANAGEMENT" });
+    await upsertStaff(owner.id, { email: ops.email!, role: "OPERATIONS" });
+    const rid = a.restaurant.id;
+
+    const cat = await saveMenuCategory(owner.id, rid, { name: "Bebidas" });
+    const p = await saveProduct(manager.id, rid, null, { name: "Sumo natural", priceCents: 12000, status: "ACTIVE", categoryId: cat.id, prepTimeMinutes: 5 });
+    expect(p.restaurantId).toBe(rid);
+    expect(p.prepTimeMinutes).toBe(5);
+    await setProductPrice(owner.id, rid, p.id, 15000);
+    expect((await db.product.findUniqueOrThrow({ where: { id: p.id } })).priceCents).toBe(15000);
+    await setHours(manager.id, rid, [{ dayOfWeek: 1, opensAt: 600, closesAt: 1320 }]);
+    await upsertZone(manager.id, rid, { neighborhoodId: geo.nb.id, feeCents: 5000, etaMinutes: 30, isActive: true });
+    await adminSetAcceptingOrders(manager.id, rid, false);
+    expect((await db.restaurant.findUniqueOrThrow({ where: { id: rid } })).acceptingOrders).toBe(false);
+
+    // Operações e clientes não gerem o cardápio; nenhum admin gere pedidos/equipa do restaurante através deste acesso
+    await expect(saveProduct(ops.id, rid, null, { name: "Intruso", priceCents: 1, status: "ACTIVE" })).rejects.toThrow(/acesso/);
+    await expect(saveProduct(customer.id, rid, null, { name: "Intruso", priceCents: 1, status: "ACTIVE" })).rejects.toThrow(/acesso/);
+    await expect(setProductPrice(customer.id, rid, p.id, 1)).rejects.toThrow(/acesso/);
+    await expect(adminSetAcceptingOrders(ops.id, rid, true)).rejects.toThrow(/permissão/);
+    await expect(setAcceptingOrders(manager.id, rid, true)).rejects.toThrow(/acesso/);
+    await expect(addRestaurantMember(manager.id, rid, { email: "x@y.test", role: "OWNER" })).rejects.toThrow(/acesso/);
+    // Restaurante inexistente
+    await expect(saveProduct(owner.id, "nao-existe", null, { name: "Xis", priceCents: 1, status: "ACTIVE" })).rejects.toThrow(/não encontrado/);
+  });
+
+  it("edição completa de restaurante pelo admin valida dados e cidade/bairro", async () => {
+    const { a, geo } = await twoRestaurants();
+    const owner = await makeUser({ isSuperAdmin: true });
+    const base = { name: "Novo Nome", responsibleName: "Resp", phone: "841234567", cityId: geo.city.id, neighborhoodId: geo.nb.id, addressLine: "Av. 1", prepTimeMinutes: 20, minOrderCents: 0, acceptsCashOnDelivery: true, latitude: -25.96, longitude: 32.57, description: "Comida caseira" };
+    await adminUpdateRestaurant(owner.id, a.restaurant.id, base);
+    const r = await db.restaurant.findUniqueOrThrow({ where: { id: a.restaurant.id } });
+    expect([r.name, r.responsibleName, r.description, r.latitude]).toEqual(["Novo Nome", "Resp", "Comida caseira", -25.96]);
+    await expect(adminUpdateRestaurant(owner.id, a.restaurant.id, { ...base, latitude: 200 })).rejects.toThrow();
+    await expect(adminUpdateRestaurant(owner.id, a.restaurant.id, { ...base, phone: "123" })).rejects.toThrow();
+    const other = await db.city.create({ data: { name: "Outra", slug: "outra-cidade" } });
+    await expect(adminUpdateRestaurant(owner.id, a.restaurant.id, { ...base, cityId: other.id })).rejects.toThrow(/Bairro/);
+    await expect(adminUpdateRestaurant(a.restaurant.id, a.restaurant.id, base)).rejects.toThrow();
+  });
+
+  it("candidatura repetida de parceiro não cria duplicados", async () => {
+    const owner = await makeUser();
+    const geo = await makeGeo();
+    await db.platformSettings.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
+    const data = { name: "Sabor Repetido", responsibleName: "Dono", phone: "845550001", email: "r@s.test", cityId: geo.city.id, addressLine: "Rua A" };
+    const [r1, r2] = [await applyAsPartner(owner.id, data), await applyAsPartner(owner.id, { ...data, name: "sabor repetido" })];
+    expect(r2.id).toBe(r1.id);
+    expect(await db.restaurant.count({ where: { status: "PENDING" } })).toBe(1);
   });
 
   it("documentos privados só são acessíveis ao dono e a administradores autorizados", () => {

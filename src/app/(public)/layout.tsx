@@ -70,6 +70,7 @@ export default async function PublicLayout({ children }: { children: React.React
             <ul className="space-y-2 text-muted">
               <li><Link className="hover:text-ink" href="/parceiro/registo">Registar o meu restaurante</Link></li>
               <li><Link className="hover:text-ink" href="/entregador/registo">Ser entregador</Link></li>
+              <li><Link className="hover:text-ink" href="/admin/login" prefetch={false}>Acesso administrativo</Link></li>
             </ul>
           </div>
           <div>

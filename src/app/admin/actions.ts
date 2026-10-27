@@ -26,7 +26,7 @@ import { db } from "@/server/db";
 
 export async function adminLogoutAction() {
   await destroySession();
-  redirect("/entrar");
+  redirect("/admin/login");
 }
 
 const pct = (fd: FormData, k: string) => {

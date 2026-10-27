@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Receipt, Clock, CheckCircle2, XCircle, Users, Store, Bike, Wallet, Percent, TrendingUp, Hourglass, AlertTriangle, Download } from "lucide-react";
+import { Receipt, Clock, CheckCircle2, XCircle, Users, Store, Bike, Wallet, Percent, TrendingUp, Hourglass, AlertTriangle, Download, Plus } from "lucide-react";
 import { requireAdmin } from "@/server/guards";
 import { platformOverview, dailySeries, topRestaurants, paymentMethodBreakdown, parseRange } from "@/server/services/finance";
 import { getSettings } from "@/server/services/settings";
@@ -30,7 +30,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
           <span><strong>Conclua a configuração inicial</strong> — defina cidades, contactos, taxas e métodos de pagamento.</span>
         </Link>
       )}
-      <PageHeader title="Dashboard" description="Indicadores calculados a partir dos dados reais da plataforma." actions={canFinance ? <a href={`/api/export/orders?periodo=${range.key}${sp.de ? `&de=${sp.de}` : ""}${sp.ate ? `&ate=${sp.ate}` : ""}`} className={buttonClass("outline", "sm")}><Download className="h-4 w-4" /> Exportar CSV</a> : null} />
+      <PageHeader title="Visão geral" description="Indicadores calculados a partir dos dados reais da plataforma." actions={<>{hasAdminPermission(user, "restaurants.manage") && <><Link href="/admin/restaurantes/novo" className={buttonClass("outline", "sm")}><Plus className="h-4 w-4" /> Restaurante</Link><Link href="/admin/produtos/novo" className={buttonClass("outline", "sm")}><Plus className="h-4 w-4" /> Produto</Link></>}{canFinance ? <a href={`/api/export/orders?periodo=${range.key}${sp.de ? `&de=${sp.de}` : ""}${sp.ate ? `&ate=${sp.ate}` : ""}`} className={buttonClass("outline", "sm")}><Download className="h-4 w-4" /> Exportar CSV</a> : null}</>} />
       <PeriodTabs current={range.key} base="/admin" />
 
       <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">

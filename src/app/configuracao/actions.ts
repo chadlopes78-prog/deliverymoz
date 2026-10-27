@@ -11,6 +11,6 @@ export async function setupOwnerAction(_: ActionResult, fd: FormData): Promise<A
     const owner = await createOwner({ setupToken: String(fd.get("setupToken") ?? ""), name: str(fd, "name"), email: str(fd, "email"), phone: str(fd, "phone"), password: String(fd.get("password") ?? "") }, ip);
     await createSession(owner.id);
   });
-  if (r?.ok) redirect("/admin/configuracoes/inicial");
+  if (r?.ok) redirect("/admin");
   return r;
 }
