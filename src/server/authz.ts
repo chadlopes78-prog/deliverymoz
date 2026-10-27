@@ -4,6 +4,8 @@ import { AppError } from "./errors";
 import {
   hasAdminPermission,
   hasRestaurantPermission,
+  restaurantStatusAllows,
+  RESTAURANT_STATUS_BLOCK_MESSAGE,
   type AdminPermission,
   type RestaurantPermission,
 } from "./permissions";
@@ -52,6 +54,9 @@ export async function assertRestaurantAccess(
   if (!member || !member.isActive) throw new AppError("FORBIDDEN", "Não tem acesso a este restaurante.");
   if (!hasRestaurantPermission(member.role, permission)) {
     throw new AppError("FORBIDDEN", "A sua função neste restaurante não permite esta ação.");
+  }
+  if (!restaurantStatusAllows(member.restaurant.status, permission)) {
+    throw new AppError("FORBIDDEN", RESTAURANT_STATUS_BLOCK_MESSAGE[member.restaurant.status] ?? "Ação indisponível para este restaurante.");
   }
   return { role: member.role, restaurant: member.restaurant };
 }

@@ -52,7 +52,7 @@ export default async function TicketDetail({ params }: { params: Promise<{ id: s
           </ActionForm>
         </div>
         <div className="space-y-4">
-          <Card><CardHeader title="Cliente" /><CardBody className="space-y-1 text-sm"><Link href={`/admin/clientes/${t.creator.id}`} className="font-semibold text-brand">{t.creator.name}</Link><p>{t.creator.email}</p><p>{formatPhone(t.creator.phone)}</p></CardBody></Card>
+          <Card><CardHeader title="Cliente" /><CardBody className="space-y-1 text-sm"><Link href={`/admin/utilizadores/${t.creator.id}`} className="font-semibold text-brand">{t.creator.name}</Link><p>{t.creator.email}</p><p>{formatPhone(t.creator.phone)}</p></CardBody></Card>
           {t.order && <Card><CardHeader title="Pedido" /><CardBody className="space-y-1 text-sm"><Link href={`/admin/pedidos/${t.order.id}`} className="font-mono font-semibold text-brand">#{t.order.code}</Link><OrderStatusBadge status={t.order.status} /></CardBody></Card>}
           <Card><CardBody className="text-sm text-muted">Responsável: {t.assignedTo?.name ?? "ninguém"}</CardBody></Card>
         </div>

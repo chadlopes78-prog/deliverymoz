@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requirePartner } from "@/server/guards";
 import { DashboardShell, type NavItem } from "@/components/dashboard-shell";
 import { Logo } from "@/components/logo";
-import { hasRestaurantPermission, type RestaurantPermission } from "@/server/permissions";
+import { hasRestaurantPermission, restaurantStatusAllows, isAdminUser, type RestaurantPermission } from "@/server/permissions";
 import { db } from "@/server/db";
 import { partnerLogoutAction } from "../actions";
 
@@ -25,10 +25,20 @@ export default async function PartnerLayout({ children }: { children: React.Reac
     { href: "/parceiro/funcionarios", label: "Funcionários", icon: "Users", perm: "staff.manage" },
     { href: "/parceiro/configuracoes", label: "Configurações", icon: "Settings" },
   ];
-  const nav = items.filter((i) => !i.perm || hasRestaurantPermission(ctx.role, i.perm)).map(({ perm: _p, ...i }) => i);
+  // O menu mostra só o que a função e o estado do restaurante permitem (o servidor verifica o mesmo em cada página e ação).
+  const nav = items.filter((i) => !i.perm || (hasRestaurantPermission(ctx.role, i.perm) && restaurantStatusAllows(ctx.restaurantStatus, i.perm))).map(({ perm: _p, ...i }) => i);
   const bottom = nav.filter((i) => ["/parceiro", "/parceiro/pedidos", "/parceiro/cardapio", "/parceiro/loja"].includes(i.href));
   return (
-    <DashboardShell brand={<Logo href="/parceiro" />} title="Painel do restaurante" subtitle={ctx.restaurantName} nav={nav} logoutAction={partnerLogoutAction} bottomNav={bottom}>
+    <DashboardShell
+      variant="partner"
+      brand={<Logo href="/parceiro" />}
+      title="Painel do restaurante"
+      subtitle={ctx.restaurantName}
+      nav={nav}
+      logoutAction={partnerLogoutAction}
+      bottomNav={bottom}
+      footerLinks={[{ href: "/", label: "Ver o site" }, ...(isAdminUser(ctx.user) ? [{ href: "/admin", label: "Centro de controlo" }] : [])]}
+    >
       {children}
     </DashboardShell>
   );

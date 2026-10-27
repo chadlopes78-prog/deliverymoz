@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getSessionUser, type SessionUser } from "./auth/session";
-import { hasAdminPermission, hasRestaurantPermission, isAdminUser, type AdminPermission, type RestaurantPermission } from "./permissions";
+import { hasAdminPermission, hasRestaurantPermission, restaurantStatusAllows, isAdminUser, type AdminPermission, type RestaurantPermission } from "./permissions";
 import type { RestaurantRole } from "@prisma/client";
 
 export async function requireUser(next = "/"): Promise<SessionUser> {
@@ -35,6 +35,7 @@ export async function requirePartner(permission?: RestaurantPermission): Promise
   const wanted = jar.get(PARTNER_COOKIE)?.value;
   const m = memberships.find((x) => x.restaurantId === wanted) ?? memberships[0];
   if (permission && !hasRestaurantPermission(m.role, permission)) redirect("/parceiro?sem-permissao=1");
+  if (permission && !restaurantStatusAllows(m.restaurant.status, permission)) redirect("/parceiro?estado=1");
   return { user, restaurantId: m.restaurantId, restaurantName: m.restaurant.name, restaurantStatus: m.restaurant.status, role: m.role };
 }
 

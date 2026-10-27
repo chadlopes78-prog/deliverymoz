@@ -9,8 +9,9 @@ export const COURIER_STATUS_LABEL: Record<CourierStatus, string> = { PENDING: "P
 export function CourierStatusBadge({ status }: { status: CourierStatus }) {
   return <Badge tone={{ PENDING: "yellow", APPROVED: "green", REJECTED: "red", SUSPENDED: "red" }[status] as "yellow"}>{COURIER_STATUS_LABEL[status]}</Badge>;
 }
+export const USER_STATUS_LABEL: Record<UserStatus, string> = { ACTIVE: "Ativa", SUSPENDED: "Suspensa", BANNED: "Banida", CLOSED: "Encerrada" };
 export function UserStatusBadge({ status }: { status: UserStatus }) {
-  return <Badge tone={{ ACTIVE: "green", SUSPENDED: "red", CLOSED: "neutral" }[status] as "green"}>{{ ACTIVE: "Ativa", SUSPENDED: "Suspensa", CLOSED: "Encerrada" }[status]}</Badge>;
+  return <Badge tone={({ ACTIVE: "green", SUSPENDED: "yellow", BANNED: "red", CLOSED: "neutral" } as const)[status]}>{USER_STATUS_LABEL[status]}</Badge>;
 }
 
 /** Estado operacional: aprovado e a aceitar pedidos = ativo; aprovado sem aceitar pedidos = pausado. */

@@ -126,7 +126,7 @@ export default async function AdminOrder({ params }: { params: Promise<{ id: str
           <Card>
             <CardHeader title="Cliente" />
             <CardBody className="space-y-1 text-sm">
-              <p><Link href={`/admin/clientes/${o.customer.id}`} className="font-semibold text-brand">{o.customerName}</Link></p>
+              <p><Link href={`/admin/utilizadores/${o.customer.id}`} className="font-semibold text-brand">{o.customerName}</Link></p>
               <p>{formatPhone(o.customerPhone)} · {o.customer.email}</p>
               <p className="text-muted">{o.street}, {o.neighborhoodName}, {o.cityName}</p>
               {o.addressReference && <p className="text-muted">Ref.: {o.addressReference}</p>}

@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Receipt, Clock, CheckCircle2, XCircle, Users, Store, Bike, Wallet, Percent, TrendingUp, Hourglass, AlertTriangle, Download, Plus } from "lucide-react";
+import { Receipt, Clock, CheckCircle2, XCircle, Users, Store, Bike, Wallet, Percent, TrendingUp, Hourglass, AlertTriangle, Download, Plus, Package, ChevronRight } from "lucide-react";
+import { platformActivity, platformTotals } from "@/server/services/activity";
+import { ActivityList } from "@/components/activity-list";
 import { requireAdmin } from "@/server/guards";
 import { platformOverview, dailySeries, topRestaurants, paymentMethodBreakdown, parseRange } from "@/server/services/finance";
 import { getSettings } from "@/server/services/settings";
@@ -19,7 +21,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const settings = await getSettings();
   const range = parseRange(sp);
   const canFinance = hasAdminPermission(user, "finance.view");
-  const [o, series, top, methods] = await Promise.all([platformOverview(range), dailySeries(range), topRestaurants(range), paymentMethodBreakdown(range)]);
+  const [o, series, top, methods, t, activity] = await Promise.all([platformOverview(range), dailySeries(range), topRestaurants(range), paymentMethodBreakdown(range), platformTotals(), platformActivity({ take: 10 })]);
   const m = (v: number) => formatMoney(v, o.currency);
   return (
     <>
@@ -31,6 +33,36 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         </Link>
       )}
       <PageHeader title="Visão geral" description="Indicadores calculados a partir dos dados reais da plataforma." actions={<>{hasAdminPermission(user, "restaurants.manage") && <><Link href="/admin/restaurantes/novo" className={buttonClass("outline", "sm")}><Plus className="h-4 w-4" /> Restaurante</Link><Link href="/admin/produtos/novo" className={buttonClass("outline", "sm")}><Plus className="h-4 w-4" /> Produto</Link></>}{canFinance ? <a href={`/api/export/orders?periodo=${range.key}${sp.de ? `&de=${sp.de}` : ""}${sp.ate ? `&ate=${sp.ate}` : ""}`} className={buttonClass("outline", "sm")}><Download className="h-4 w-4" /> Exportar CSV</a> : null}</>} />
+      <section aria-labelledby="plataforma">
+        <h2 id="plataforma" className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Plataforma (total)</h2>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="Restaurantes" value={t.restaurants} hint={`${t.restActive} ativos · ${t.restSuspended} suspensos`} icon={Store} tone="brand" />
+          <Link href="/admin/aprovacoes" className="block rounded-[var(--radius-card)] focus-visible:outline-2"><StatCard label="Registos pendentes" value={t.restPending} hint="Restaurantes a aguardar aprovação" icon={Hourglass} tone={t.restPending ? "warn" : "neutral"} /></Link>
+          <StatCard label="Compradores" value={t.buyers} hint={`${t.users} utilizadores no total`} icon={Users} />
+          <StatCard label="Contas de parceiros" value={t.partners} icon={Store} />
+          <StatCard label="Produtos publicados" value={t.productsActive} hint="Disponíveis em restaurantes aprovados" icon={Package} />
+          <StatCard label="Pedidos recebidos" value={t.ordersTotal} hint={`${t.ordersInProgress} em curso`} icon={Receipt} tone="brand" />
+          <StatCard label="Concluídos / cancelados" value={`${t.ordersDone} / ${t.ordersCancelled}`} icon={CheckCircle2} tone="accent" />
+          {canFinance && <StatCard label="Volume de pedidos" value={m(t.gmvCents)} hint="Valor total dos pedidos válidos (não é receita recebida)" icon={TrendingUp} />}
+        </div>
+      </section>
+
+      <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_380px]">
+        <Card>
+          <CardHeader title="Atividade recente" action={<Link href="/admin/atividade" className="text-sm font-semibold text-brand">Ver tudo</Link>} />
+          <CardBody><ActivityList items={activity} /></CardBody>
+        </Card>
+        <Card>
+          <CardHeader title="Atalhos" />
+          <CardBody className="grid gap-2 text-sm">
+            {[["/admin/aprovacoes", "Rever registos pendentes"], ["/admin/restaurantes", "Gerir restaurantes"], ["/admin/produtos", "Gerir produtos"], ["/admin/pedidos", "Acompanhar pedidos"], ["/admin/compradores", "Gerir compradores"], ["/admin/administradores", "Administradores e permissões"]].map(([href, label]) => (
+              <Link key={href} href={href} className="flex items-center justify-between rounded-xl border border-line px-3 py-2.5 font-semibold hover:border-brand hover:text-brand">{label}<ChevronRight className="h-4 w-4" /></Link>
+            ))}
+          </CardBody>
+        </Card>
+      </section>
+
+      <h2 className="mb-3 mt-8 text-sm font-bold uppercase tracking-wide text-muted">Desempenho por período</h2>
       <PeriodTabs current={range.key} base="/admin" />
 
       <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">

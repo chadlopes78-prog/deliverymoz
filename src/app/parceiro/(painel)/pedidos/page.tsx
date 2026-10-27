@@ -20,13 +20,14 @@ import { OrderStatusBadge, PaymentStatusBadge, PAYMENT_METHOD_LABEL, DELIVERY_ST
 import { ORDER_STATUS_LABEL } from "@/server/services/order-state";
 import { formatMoney } from "@/lib/money";
 import { formatPhone, cn } from "@/lib/utils";
+import { zonedToUtc } from "@/lib/hours";
 import { orderTransitionAction } from "../../actions";
 
 export const metadata = { title: "Pedidos" };
 
 const ACTIVE: OrderStatus[] = ["PLACED", "ACCEPTED", "PREPARING", "READY_FOR_PICKUP", "PICKED_UP", "IN_TRANSIT"];
 
-export default async function PartnerOrders({ searchParams }: { searchParams: Promise<{ tab?: string; pedido?: string; q?: string; estado?: string; pagina?: string }> }) {
+export default async function PartnerOrders({ searchParams }: { searchParams: Promise<{ tab?: string; pedido?: string; q?: string; estado?: string; pagina?: string; de?: string; ate?: string }> }) {
   const sp = await searchParams;
   const ctx = await requirePartner("orders.manage");
   const settings = await getSettings();
@@ -125,14 +126,21 @@ export default async function PartnerOrders({ searchParams }: { searchParams: Pr
   );
 }
 
-async function History({ ctx, sp, tz }: { ctx: { restaurantId: string }; sp: { q?: string; estado?: string; pagina?: string }; tz: string }) {
+async function History({ ctx, sp, tz }: { ctx: { restaurantId: string }; sp: { q?: string; estado?: string; pagina?: string; de?: string; ate?: string }; tz: string }) {
   const { page, pageSize, skip, take } = pageParams(sp, 25);
+  const day = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const from = day(sp.de) ? zonedToUtc(`${sp.de}T00:00`, tz) : null;
+  const to = day(sp.ate) ? zonedToUtc(`${sp.ate}T23:59`, tz) : null;
   const where: Prisma.OrderWhereInput = {
     restaurantId: ctx.restaurantId,
-    status: sp.estado ? (sp.estado as OrderStatus) : { not: "PENDING_PAYMENT" },
+    status: sp.estado && sp.estado in ORDER_STATUS_LABEL ? (sp.estado as OrderStatus) : { not: "PENDING_PAYMENT" },
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(sp.q ? { OR: [{ code: sp.q.replace("#", "").toUpperCase() }, { customerName: { contains: sp.q, mode: "insensitive" } }] } : {}),
   };
-  const [rows, total] = await Promise.all([db.order.findMany({ where, skip, take, orderBy: { createdAt: "desc" } }), db.order.count({ where })]);
+  const [rows, total] = await Promise.all([
+    db.order.findMany({ where, skip, take, orderBy: { createdAt: "desc" }, include: { items: { select: { id: true, productName: true, quantity: true } } } }),
+    db.order.count({ where }),
+  ]);
   return (
     <>
       <PageHeader title="Pedidos" />
@@ -140,18 +148,21 @@ async function History({ ctx, sp, tz }: { ctx: { restaurantId: string }; sp: { q
       <FilterBar action="/parceiro/pedidos" q={sp.q} qPlaceholder="Código ou cliente" clearHref="/parceiro/pedidos?tab=historico">
         <input type="hidden" name="tab" value="historico" />
         <FilterSelect name="estado" value={sp.estado} label="Todos os estados" options={Object.entries(ORDER_STATUS_LABEL).filter(([k]) => k !== "PENDING_PAYMENT")} />
+        <label className="flex items-center gap-1 text-sm text-muted">De <input type="date" name="de" defaultValue={sp.de} className="h-10 min-w-0 rounded-xl border border-line bg-surface px-2 text-ink" /></label>
+        <label className="flex items-center gap-1 text-sm text-muted">Até <input type="date" name="ate" defaultValue={sp.ate} className="h-10 min-w-0 rounded-xl border border-line bg-surface px-2 text-ink" /></label>
       </FilterBar>
       <DataTable rows={rows} rowKey={(r) => r.id} empty={<EmptyState icon={Receipt} title="Ainda não existem pedidos" />}
         columns={[
           { key: "c", header: "Pedido", cell: (r) => <span className="font-mono">#{r.code}</span> },
           { key: "d", header: "Data", cell: (r) => formatDate(r.createdAt, undefined, tz) },
           { key: "n", header: "Cliente", cell: (r) => r.customerName },
+          { key: "i", header: "Produtos", cell: (r) => r.items.map((i) => `${i.quantity}× ${i.productName}`).join(", ") },
           { key: "t", header: "Subtotal", cell: (r) => formatMoney(r.subtotalCents, r.currency) },
           { key: "p", header: "Pagamento", cell: (r) => <PaymentStatusBadge status={r.paymentStatus} /> },
           { key: "s", header: "Estado", cell: (r) => <OrderStatusBadge status={r.status} /> },
           { key: "r", header: "Motivo", cell: (r) => r.rejectReason ?? r.cancelReason ?? "", hideOnMobile: true },
         ]} />
-      <Pagination page={page} pageSize={pageSize} total={total} baseHref="/parceiro/pedidos" params={{ tab: "historico", q: sp.q, estado: sp.estado }} />
+      <Pagination page={page} pageSize={pageSize} total={total} baseHref="/parceiro/pedidos" params={{ tab: "historico", q: sp.q, estado: sp.estado, de: sp.de, ate: sp.ate }} />
     </>
   );
 }

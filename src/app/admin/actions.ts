@@ -114,7 +114,7 @@ export async function userStatusAction(_: ActionResult, fd: FormData): Promise<A
   const admin = await requireAdmin("customers.manage");
   return runAction(async () => {
     await setUserStatus(admin.id, str(fd, "id"), str(fd, "status") as "ACTIVE", optStr(fd, "reason"));
-    revalidatePath("/admin/clientes", "layout");
+    revalidatePath("/admin", "layout");
   }, "Estado da conta atualizado.");
 }
 
@@ -339,16 +339,19 @@ export async function ticketReplyAction(_: ActionResult, fd: FormData): Promise<
 export async function staffAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const admin = await requireAdmin("staff.manage");
   return runAction(async () => {
-    await upsertStaff(admin.id, { email: str(fd, "email"), role: str(fd, "role") as StaffRole, name: optStr(fd, "name") ?? undefined, phone: optStr(fd, "phone") ?? undefined, password: optStr(fd, "password") ?? undefined });
-    revalidatePath("/admin/funcionarios");
-  }, "Funcionário guardado.");
+    await upsertStaff(admin.id, {
+      email: str(fd, "email"), role: str(fd, "role") as StaffRole, name: optStr(fd, "name") ?? undefined, phone: optStr(fd, "phone") ?? undefined,
+      password: optStr(fd, "password") ?? undefined, permissions: fd.getAll("permissions").map(String),
+    });
+    revalidatePath("/admin", "layout");
+  }, "Administrador guardado.");
 }
 
 export async function staffActiveAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const admin = await requireAdmin("staff.manage");
   return runAction(async () => {
     await setStaffActive(admin.id, str(fd, "id"), bool(fd, "isActive"));
-    revalidatePath("/admin/funcionarios");
+    revalidatePath("/admin", "layout");
   }, "Funcionário atualizado.");
 }
 

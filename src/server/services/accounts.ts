@@ -31,10 +31,12 @@ export async function registerCustomer(raw: unknown, ip = "unknown") {
   const phone = normalizeMzPhone(input.phone);
   if (!phone) throw new AppError("VALIDATION", "Número de telefone moçambicano inválido.");
   try {
-    return await db.user.create({
+    const user = await db.user.create({
       data: { name: input.name, email: input.email, phone, passwordHash: await hashPassword(input.password) },
       select: { id: true, name: true, email: true },
     });
+    await audit({ actorId: user.id, action: "user.register", entityType: "User", entityId: user.id, ip });
+    return user;
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       throw new AppError("CONFLICT", "Já existe uma conta com este e-mail ou telefone.");
@@ -62,6 +64,7 @@ export async function authenticate(identifier: string, password: string, ip = "u
   const ok = await verifyPassword(user.passwordHash, password);
   if (!ok) throw new AppError("UNAUTHENTICATED", "E-mail/telefone ou palavra-passe incorretos.");
   if (user.status === "SUSPENDED") throw new AppError("FORBIDDEN", "A sua conta está suspensa. Contacte o suporte.");
+  if (user.status === "BANNED") throw new AppError("FORBIDDEN", "O acesso desta conta foi retirado pela plataforma.");
   if (user.status === "CLOSED") throw new AppError("FORBIDDEN", "Esta conta foi encerrada.");
   return user;
 }
@@ -180,6 +183,9 @@ export async function createOwner(raw: { setupToken: string; name: string; email
   }
   if (!safeEqual(raw.setupToken, expected)) throw new AppError("FORBIDDEN", "Código de configuração inválido.");
   const input = registerSchema.parse(raw);
+  // Se OWNER_EMAIL estiver definido, só esse e-mail pode ficar com a conta do proprietário.
+  const ownerEmail = process.env.OWNER_EMAIL?.trim().toLowerCase();
+  if (ownerEmail && input.email !== ownerEmail) throw new AppError("FORBIDDEN", "Este e-mail não está autorizado a criar a conta do proprietário.");
   const pwd = passwordProblems(input.password);
   if (pwd) throw new AppError("VALIDATION", pwd);
   if (input.password.length < 12) throw new AppError("VALIDATION", "A palavra-passe do proprietário deve ter pelo menos 12 caracteres.");

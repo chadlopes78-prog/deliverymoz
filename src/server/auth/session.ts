@@ -48,7 +48,7 @@ const sessionUserSelect = {
   phone: true,
   status: true,
   isSuperAdmin: true,
-  staff: { select: { role: true, isActive: true } },
+  staff: { select: { role: true, isActive: true, permissions: true } },
   courier: { select: { id: true, status: true } },
   restaurantMembers: {
     where: { isActive: true },

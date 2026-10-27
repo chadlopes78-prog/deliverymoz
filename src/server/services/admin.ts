@@ -1,3 +1,4 @@
+import { DELEGABLE_PERMISSIONS } from "../permissions";
 import { z } from "zod";
 import { Prisma, type PaymentProviderKey, type StaffRole } from "@prisma/client";
 import { db } from "../db";
@@ -11,18 +12,27 @@ import { notifyUsers } from "./notifications";
 
 // ─────────────────────────── Utilizadores ───────────────────────────
 
-export async function setUserStatus(adminId: string, userId: string, status: "ACTIVE" | "SUSPENDED", reason?: string | null) {
+/**
+ * Suspende (temporário), bane (definitivo) ou reativa uma conta. Os dados e o histórico de pedidos mantêm-se;
+ * as sessões ativas são terminadas e o login é recusado. Fica registado quem fez a ação, quando e porquê.
+ */
+export async function setUserStatus(adminId: string, userId: string, status: "ACTIVE" | "SUSPENDED" | "BANNED", reason?: string | null) {
   const admin = await assertAdmin(adminId, "customers.manage");
+  if (!["ACTIVE", "SUSPENDED", "BANNED"].includes(status)) throw new AppError("VALIDATION", "Estado inválido.");
   if (adminId === userId) throw new AppError("VALIDATION", "Não pode alterar o estado da sua própria conta.");
   const user = await db.user.findUnique({ where: { id: userId }, include: { staff: true } });
   if (!user) throw new AppError("NOT_FOUND", "Utilizador não encontrado.");
   if (user.status === "CLOSED") throw new AppError("CONFLICT", "A conta foi encerrada.");
-  if ((user.isSuperAdmin || user.staff) && !admin.isSuperAdmin) throw new AppError("FORBIDDEN", "Apenas o Super Admin pode alterar contas administrativas.");
-  if (user.isSuperAdmin) throw new AppError("FORBIDDEN", "A conta do proprietário não pode ser suspensa.");
-  if (status === "SUSPENDED" && !reason?.trim()) throw new AppError("VALIDATION", "Indique o motivo.");
-  await db.user.update({ where: { id: userId }, data: { status, suspendedReason: status === "SUSPENDED" ? reason!.trim() : null } });
-  if (status === "SUSPENDED") await db.session.deleteMany({ where: { userId } });
-  await audit({ actorId: adminId, action: status === "SUSPENDED" ? "user.suspend" : "user.reactivate", entityType: "User", entityId: userId, metadata: { reason } });
+  if (user.isSuperAdmin) throw new AppError("FORBIDDEN", "A conta do proprietário da plataforma não pode ser suspensa nem banida.");
+  if (user.staff && !admin.isSuperAdmin) throw new AppError("FORBIDDEN", "Apenas o Super Admin pode alterar contas administrativas.");
+  if ((status === "BANNED" || user.status === "BANNED") && !admin.isSuperAdmin) throw new AppError("FORBIDDEN", "Apenas o Super Admin pode banir ou reativar contas banidas.");
+  if (status !== "ACTIVE" && !reason?.trim()) throw new AppError("VALIDATION", "Indique o motivo.");
+  await db.$transaction([
+    db.user.update({ where: { id: userId }, data: { status, suspendedReason: status === "ACTIVE" ? null : reason!.trim().slice(0, 500) } }),
+    ...(status !== "ACTIVE" ? [db.session.deleteMany({ where: { userId } })] : []),
+  ]);
+  const action = { ACTIVE: "user.reactivate", SUSPENDED: "user.suspend", BANNED: "user.ban" }[status];
+  await audit({ actorId: adminId, action, entityType: "User", entityId: userId, metadata: { reason: reason?.trim() || null, previous: user.status } });
 }
 
 // ─────────────────────────── Funcionários administrativos ───────────────────────────
@@ -30,9 +40,13 @@ export async function setUserStatus(adminId: string, userId: string, status: "AC
 /** Apenas o Super Admin cria/gere funcionários. Nunca é possível criar outro Super Admin por esta via. */
 export async function upsertStaff(
   adminId: string,
-  input: { email: string; role: StaffRole; name?: string; phone?: string; password?: string },
+  input: { email: string; role: StaffRole; name?: string; phone?: string; password?: string; permissions?: string[] },
 ) {
   await assertAdmin(adminId, "staff.manage");
+  // Só permissões delegáveis; as privilegiadas (configurações, administradores, comissões, auditoria) ficam com o Super Admin.
+  const permissions = Array.from(new Set(input.permissions ?? []));
+  const invalid = permissions.filter((p) => !(DELEGABLE_PERMISSIONS as string[]).includes(p));
+  if (invalid.length) throw new AppError("FORBIDDEN", "Algumas permissões só podem pertencer ao Super Admin.");
   const email = input.email.trim().toLowerCase();
   let user = await db.user.findUnique({ where: { email } });
   if (!user) {
@@ -49,15 +63,16 @@ export async function upsertStaff(
     }
   }
   if (user.isSuperAdmin) throw new AppError("VALIDATION", "Este utilizador já é Super Admin.");
-  await db.staffMember.upsert({ where: { userId: user.id }, create: { userId: user.id, role: input.role }, update: { role: input.role, isActive: true } });
-  await audit({ actorId: adminId, action: "staff.upsert", entityType: "User", entityId: user.id, metadata: { role: input.role } });
+  if (user.status !== "ACTIVE") throw new AppError("CONFLICT", "A conta não está ativa.");
+  await db.staffMember.upsert({ where: { userId: user.id }, create: { userId: user.id, role: input.role, permissions }, update: { role: input.role, permissions, isActive: true } });
+  await audit({ actorId: adminId, action: "staff.upsert", entityType: "User", entityId: user.id, metadata: { role: input.role, permissions } });
 }
 
 export async function setStaffActive(adminId: string, staffId: string, isActive: boolean) {
   await assertAdmin(adminId, "staff.manage");
   const s = await db.staffMember.update({ where: { id: staffId }, data: { isActive } });
   if (!isActive) await db.session.deleteMany({ where: { userId: s.userId } });
-  await audit({ actorId: adminId, action: isActive ? "staff.activate" : "staff.deactivate", entityType: "StaffMember", entityId: staffId });
+  await audit({ actorId: adminId, action: isActive ? "staff.activate" : "staff.deactivate", entityType: "User", entityId: s.userId });
 }
 
 // ─────────────────────────── Configurações ───────────────────────────

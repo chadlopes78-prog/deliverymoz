@@ -19,24 +19,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     db.refund.count({ where: { status: "PENDING" } }),
     db.supportTicket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] }, category: { in: COMPLAINT_CATEGORIES } } }),
   ]);
-  const G = { dash: "Dashboard", com: "Gestão comercial", ops: "Operações", fin: "Financeiro", mkt: "Marketing", adm: "Administração", sup: "Suporte" };
+  const G = { dash: "Dashboard", com: "Gestão comercial", people: "Pessoas", ops: "Operações", fin: "Financeiro e relatórios", mkt: "Marketing", adm: "Administração", sup: "Suporte" };
   const items: (NavItem & { perm: AdminPermission })[] = [
     { section: G.dash, href: "/admin", label: "Visão geral", icon: "LayoutDashboard", exact: true, perm: "dashboard.view" },
     { section: G.com, href: "/admin/restaurantes", label: "Restaurantes", icon: "Store", perm: "restaurants.view" },
+    { section: G.com, href: "/admin/pedidos", label: "Pedidos", icon: "Receipt", perm: "orders.view" },
     { section: G.com, href: "/admin/produtos", label: "Produtos", icon: "Package", perm: "restaurants.view" },
     { section: G.com, href: "/admin/categorias", label: "Categorias", icon: "FolderTree", perm: "restaurants.view" },
-    { section: G.com, href: "/admin/pedidos", label: "Pedidos", icon: "Receipt", perm: "orders.view" },
-    { section: G.ops, href: "/admin/entregadores", label: "Entregadores", icon: "Bike", perm: "couriers.view" },
-    { section: G.ops, href: "/admin/clientes", label: "Clientes", icon: "Users", perm: "customers.view" },
+    { section: G.people, href: "/admin/compradores", label: "Compradores", icon: "ShoppingBag", perm: "customers.view" },
+    { section: G.people, href: "/admin/parceiros", label: "Parceiros", icon: "Handshake", perm: "restaurants.view" },
+    { section: G.people, href: "/admin/utilizadores", label: "Utilizadores", icon: "Users", perm: "customers.view" },
+    { section: G.ops, href: "/admin/entregadores", label: "Entregadores", icon: "Bike", perm: "couriers.view", badge: pendingCouriers },
     { section: G.ops, href: "/admin/entregas", label: "Entregas", icon: "Truck", perm: "deliveries.manage", badge: searching },
-    { section: G.fin, href: "/admin/vendas", label: "Vendas", icon: "BarChart3", perm: "finance.view" },
+    { section: G.fin, href: "/admin/vendas", label: "Vendas e relatórios", icon: "BarChart3", perm: "finance.view" },
     { section: G.fin, href: "/admin/comissoes", label: "Comissões", icon: "Percent", perm: "commissions.manage" },
     { section: G.fin, href: "/admin/transacoes", label: "Transações", icon: "ArrowLeftRight", perm: "finance.view", badge: pendingRefunds },
     { section: G.mkt, href: "/admin/promocoes", label: "Promoções", icon: "Megaphone", perm: "marketing.manage" },
     { section: G.mkt, href: "/admin/cupons", label: "Cupões", icon: "Ticket", perm: "marketing.manage" },
     { section: G.mkt, href: "/admin/banners", label: "Banners", icon: "Image", perm: "marketing.manage" },
-    { section: G.adm, href: "/admin/aprovacoes", label: "Aprovação de restaurantes", icon: "BadgeCheck", perm: "restaurants.view", badge: pendingRestaurants + pendingCouriers },
-    { section: G.adm, href: "/admin/funcionarios", label: "Utilizadores e permissões", icon: "UserCog", perm: "staff.manage" },
+    { section: G.adm, href: "/admin/aprovacoes", label: "Registos pendentes", icon: "BadgeCheck", perm: "restaurants.view", badge: pendingRestaurants },
+    { section: G.adm, href: "/admin/administradores", label: "Administradores e permissões", icon: "UserCog", perm: "staff.manage" },
+    { section: G.adm, href: "/admin/atividade", label: "Atividade da plataforma", icon: "Activity", perm: "dashboard.view" },
     { section: G.adm, href: "/admin/configuracoes", label: "Configurações", icon: "Settings", perm: "settings.manage" },
     { section: G.adm, href: "/admin/auditoria", label: "Segurança e auditoria", icon: "ShieldCheck", perm: "audit.view" },
     { section: G.sup, href: "/admin/reclamacoes", label: "Reclamações", icon: "MessageSquareWarning", perm: "support.manage", badge: openComplaints },
@@ -44,7 +47,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ];
   const nav = items.filter((i) => hasAdminPermission(user, i.perm)).map(({ perm: _p, ...i }) => i);
   return (
-    <DashboardShell brand={<Logo href="/admin" />} title="Administração" subtitle={user.isSuperAdmin ? "Super Admin" : user.name} nav={nav} logoutAction={adminLogoutAction}>
+    <DashboardShell
+      variant="admin"
+      brand={<Logo href="/admin" />}
+      title="Centro de controlo"
+      subtitle={user.isSuperAdmin ? `${user.name} · Super Admin` : `${user.name} · Administrador`}
+      nav={nav}
+      logoutAction={adminLogoutAction}
+      footerLinks={[{ href: "/", label: "Ver o site" }, ...(user.restaurantMembers.length ? [{ href: "/parceiro", label: "Painel do meu restaurante" }] : [])]}
+    >
       {children}
     </DashboardShell>
   );
