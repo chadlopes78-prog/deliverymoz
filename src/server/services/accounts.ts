@@ -210,3 +210,46 @@ export async function createOwner(raw: { setupToken: string; name: string; email
     { timeout: 15_000 },
   );
 }
+
+/** E-mail autorizado a ficar com a conta do proprietário (opcional, definido no servidor). */
+export function ownerEmail() {
+  return process.env.OWNER_EMAIL?.trim().toLowerCase() || null;
+}
+
+/**
+ * Ainda não há proprietário e esta conta é a indicada em OWNER_EMAIL: deve ser encaminhada para a ativação,
+ * e não para a área de compras.
+ */
+export async function needsOwnerActivation(user: { email: string | null; isSuperAdmin: boolean }) {
+  const expected = ownerEmail();
+  if (!expected || user.isSuperAdmin || user.email?.toLowerCase() !== expected) return false;
+  return !(await ownerExists());
+}
+
+/**
+ * Ativa a conta com sessão iniciada como Super Admin (quando ainda não existe nenhum).
+ * Exige o código de configuração do servidor e a palavra-passe atual da conta; respeita OWNER_EMAIL.
+ */
+export async function activateOwnerAccount(userId: string, setupToken: string, password: string, ip = "unknown") {
+  await rateLimit(`setup:${ip}`, 10, 3600);
+  const expected = process.env.SETUP_TOKEN;
+  if (!expected || expected.length < 16) {
+    throw new AppError("UNAVAILABLE", "Defina a variável SETUP_TOKEN (mínimo 16 caracteres) no servidor para ativar a conta do proprietário.");
+  }
+  if (!safeEqual(setupToken, expected)) throw new AppError("FORBIDDEN", "Código de configuração inválido.");
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user || user.status !== "ACTIVE") throw new AppError("UNAUTHENTICATED", "Sessão inválida.");
+  const allowed = ownerEmail();
+  if (allowed && user.email?.toLowerCase() !== allowed) throw new AppError("FORBIDDEN", "Este e-mail não está autorizado a ficar com a conta do proprietário.");
+  if (!(await verifyPassword(user.passwordHash, password))) throw new AppError("VALIDATION", "A palavra-passe atual está incorreta.");
+  return db.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(424242)`;
+      if ((await tx.user.count({ where: { isSuperAdmin: true } })) > 0) throw new AppError("CONFLICT", "A conta do proprietário já foi criada.");
+      const owner = await tx.user.update({ where: { id: user.id }, data: { isSuperAdmin: true } });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "setup.owner_activated", entityType: "User", entityId: user.id, ip } });
+      return owner;
+    },
+    { timeout: 15_000 },
+  );
+}

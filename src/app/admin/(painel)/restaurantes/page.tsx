@@ -18,11 +18,12 @@ import { Thumb } from "@/components/public/restaurant-card";
 
 export const metadata = { title: "Restaurantes" };
 
-const STATUS_OPTIONS: [string, string][] = [["ATIVO", "Ativo"], ["PAUSADO", "Pausado"], ...Object.entries(RESTAURANT_STATUS_LABEL).filter(([k]) => k !== "APPROVED")];
+const STATUS_OPTIONS: [string, string][] = [["ATIVO", "Ativo"], ["PAUSADO", "Pausado"], ["DESPUBLICADO", "Despublicado"], ...Object.entries(RESTAURANT_STATUS_LABEL).filter(([k]) => k !== "APPROVED")];
 
 function statusWhere(v?: string): Prisma.RestaurantWhereInput {
-  if (v === "ATIVO") return { status: "APPROVED", acceptingOrders: true };
-  if (v === "PAUSADO") return { status: "APPROVED", acceptingOrders: false };
+  if (v === "ATIVO") return { status: "APPROVED", acceptingOrders: true, isListed: true };
+  if (v === "PAUSADO") return { status: "APPROVED", acceptingOrders: false, isListed: true };
+  if (v === "DESPUBLICADO") return { status: "APPROVED", isListed: false };
   if (v && v in RESTAURANT_STATUS_LABEL) return { status: v as RestaurantStatus };
   return {};
 }
@@ -71,7 +72,7 @@ export default async function AdminRestaurants({ searchParams }: { searchParams:
           { key: "resp", header: "Responsável", cell: (r) => r.responsibleName },
           { key: "city", header: "Cidade", cell: (r) => r.city.name },
           { key: "nb", header: "Bairro", cell: (r) => r.neighborhood?.name ?? "—", hideOnMobile: true },
-          { key: "status", header: "Estado", cell: (r) => <RestaurantOperationalBadge status={r.status} acceptingOrders={r.acceptingOrders} /> },
+          { key: "status", header: "Estado", cell: (r) => <RestaurantOperationalBadge status={r.status} acceptingOrders={r.acceptingOrders} isListed={r.isListed} /> },
           { key: "created", header: "Registo", cell: (r) => formatDate(r.createdAt, { dateStyle: "short" }), hideOnMobile: true },
           {
             key: "actions", header: "Ações", interactive: true,

@@ -124,3 +124,61 @@ describe("atividade e totais da plataforma", () => {
     void owner;
   });
 });
+
+describe("ativação da conta do proprietário (conta já registada como compradora)", () => {
+  const prevToken = process.env.SETUP_TOKEN;
+  const prevOwner = process.env.OWNER_EMAIL;
+  const restore = () => {
+    process.env.SETUP_TOKEN = prevToken;
+    if (prevOwner === undefined) delete process.env.OWNER_EMAIL; else process.env.OWNER_EMAIL = prevOwner;
+  };
+
+  it("encaminha para a ativação, exige código e palavra-passe, respeita OWNER_EMAIL e só acontece uma vez", async () => {
+    process.env.SETUP_TOKEN = "codigo-de-teste-0123456789";
+    process.env.OWNER_EMAIL = "dono@plataforma.test";
+    try {
+      const { activateOwnerAccount, needsOwnerActivation } = await import("@/server/services/accounts");
+      const dono = await registerCustomer({ name: "Dono", email: "dono@plataforma.test", phone: "848880101", password: "DonoSenha123" });
+      const outro = await registerCustomer({ name: "Outro", email: "outro@plataforma.test", phone: "848880102", password: "OutroSenha123" });
+      expect(await needsOwnerActivation({ email: "dono@plataforma.test", isSuperAdmin: false })).toBe(true);
+      expect(await needsOwnerActivation({ email: "outro@plataforma.test", isSuperAdmin: false })).toBe(false);
+      // Depois do login, a conta do proprietário vai para a ativação e não para a área de compras
+      expect(await destinationAfterLogin(dono.id, "comprador")).toBe("/admin/login");
+      expect(await destinationAfterLogin(outro.id, "comprador")).toBe("/");
+
+      await expect(activateOwnerAccount(dono.id, "errado-errado-errado", "DonoSenha123")).rejects.toThrow(/inválido/);
+      await expect(activateOwnerAccount(dono.id, "codigo-de-teste-0123456789", "errada")).rejects.toThrow(/incorreta/);
+      await expect(activateOwnerAccount(outro.id, "codigo-de-teste-0123456789", "OutroSenha123")).rejects.toThrow(/autorizado/);
+      await activateOwnerAccount(dono.id, "codigo-de-teste-0123456789", "DonoSenha123");
+      expect((await db.user.findUniqueOrThrow({ where: { id: dono.id } })).isSuperAdmin).toBe(true);
+      expect(await db.auditLog.count({ where: { action: "setup.owner_activated", entityId: dono.id } })).toBe(1);
+      expect(await destinationAfterLogin(dono.id, "comprador")).toBe("/admin");
+      // Uma segunda ativação é recusada
+      delete process.env.OWNER_EMAIL;
+      await expect(activateOwnerAccount(outro.id, "codigo-de-teste-0123456789", "OutroSenha123")).rejects.toThrow(/já foi criada/);
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("publicar e despublicar restaurantes", () => {
+  it("restaurante despublicado sai do site e deixa de aceitar pedidos, sem perder a aprovação", async () => {
+    const { adminSetListed } = await import("@/server/services/restaurants");
+    const { listRestaurants } = await import("@/server/services/catalog");
+    const { restaurantAvailability } = await import("@/server/services/availability");
+    const owner = await makeUser({ isSuperAdmin: true });
+    const partner = await makeUser();
+    const geo = await makeGeo();
+    const { restaurant } = await makeRestaurant({ cityId: geo.city.id, neighborhoodId: geo.nb.id, ownerId: partner.id });
+    expect((await listRestaurants({ cityId: geo.city.id })).some((r) => r.id === restaurant.id)).toBe(true);
+    await expect(adminSetListed(partner.id, restaurant.id, false)).rejects.toThrow(/permissão/);
+    await adminSetListed(owner.id, restaurant.id, false);
+    const r = await db.restaurant.findUniqueOrThrow({ where: { id: restaurant.id }, include: { hours: true } });
+    expect(r.status).toBe("APPROVED");
+    expect((await listRestaurants({ cityId: geo.city.id })).some((x) => x.id === restaurant.id)).toBe(false);
+    expect(restaurantAvailability(r, "Africa/Maputo").orderable).toBe(false);
+    await adminSetListed(owner.id, restaurant.id, true);
+    expect((await listRestaurants({ cityId: geo.city.id })).some((x) => x.id === restaurant.id)).toBe(true);
+  });
+});

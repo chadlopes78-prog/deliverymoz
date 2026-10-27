@@ -45,7 +45,7 @@ export default async function EditRestaurant({ params }: { params: Promise<{ id:
   return (
     <div className="max-w-4xl">
       <Link href={`/admin/restaurantes/${r.id}`} className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-brand"><ArrowLeft className="h-4 w-4" /> Detalhes do restaurante</Link>
-      <PageHeader title={`Editar ${r.name}`} description="As alterações ficam gravadas na base de dados e refletem-se no site público." actions={<RestaurantOperationalBadge status={r.status} acceptingOrders={r.acceptingOrders} />} />
+      <PageHeader title={`Editar ${r.name}`} description="As alterações ficam gravadas na base de dados e refletem-se no site público." actions={<RestaurantOperationalBadge status={r.status} acceptingOrders={r.acceptingOrders} isListed={r.isListed} />} />
 
       <Card className="mb-5">
         <CardHeader title="Estado" description={readiness.ready ? "Publicado: o restaurante aparece aos clientes." : `Não publicado. Em falta: ${readiness.items.filter((i) => !i.done).map((i) => i.label.toLowerCase()).join(", ")}.`} />

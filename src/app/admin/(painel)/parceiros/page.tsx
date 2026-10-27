@@ -33,7 +33,7 @@ export default async function AdminPartners({ searchParams }: { searchParams: Pr
       select: {
         id: true, name: true, email: true, phone: true, status: true, createdAt: true, lastLoginAt: true,
         restaurantMembers: {
-          select: { id: true, role: true, isActive: true, restaurant: { select: { id: true, name: true, status: true, acceptingOrders: true, _count: { select: { orders: true, products: { where: { status: "ACTIVE" } } } } } } },
+          select: { id: true, role: true, isActive: true, restaurant: { select: { id: true, name: true, status: true, acceptingOrders: true, isListed: true, _count: { select: { orders: true, products: { where: { status: "ACTIVE" } } } } } } },
         },
       },
     }),
@@ -66,7 +66,7 @@ export default async function AdminPartners({ searchParams }: { searchParams: Pr
                       <span className="ml-2 text-muted">{RESTAURANT_ROLE_LABEL[m.role]}{!m.isActive && " (inativo)"}</span>
                     </span>
                     <span className="flex flex-wrap items-center gap-2">
-                      <RestaurantOperationalBadge status={m.restaurant.status} acceptingOrders={m.restaurant.acceptingOrders} />
+                      <RestaurantOperationalBadge status={m.restaurant.status} acceptingOrders={m.restaurant.acceptingOrders} isListed={m.restaurant.isListed} />
                       <Badge>{m.restaurant._count.products} produtos</Badge>
                       <Badge>{m.restaurant._count.orders} pedidos</Badge>
                     </span>

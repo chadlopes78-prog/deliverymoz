@@ -5,6 +5,7 @@ import { getSessionUser } from "@/server/auth/session";
 import { listRestaurants, activeBanners, cuisinesWithRestaurants, availableProducts, reorderRestaurantIds, type RestaurantListItem } from "@/server/services/catalog";
 import { getSettings } from "@/server/services/settings";
 import { db } from "@/server/db";
+import { needsOwnerActivation } from "@/server/services/accounts";
 import { RestaurantCard } from "@/components/public/restaurant-card";
 import { LocationButton } from "@/components/public/location-button";
 import { HeroFoodArt } from "@/components/public/food-art";
@@ -28,9 +29,18 @@ export default async function HomePage() {
   const fast = all.filter((r) => r.availability.orderable).sort((a, b) => a.etaMinutes - b.etaMinutes).slice(0, 12);
   const reorder = reorderIds.map((id) => all.find((r) => r.id === id)).filter((r): r is RestaurantListItem => !!r);
   const firstName = user?.name.split(" ")[0];
+  const activateOwner = user ? await needsOwnerActivation(user) : false;
 
   return (
     <div>
+      {activateOwner && (
+        <div className="border-b border-brand/20 bg-brand/5">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <p><strong>Esta é a conta do proprietário da plataforma.</strong> Ative o painel de administração para gerir o DeliveryMoz.</p>
+            <Link href="/admin/login" className={buttonClass("primary", "sm")}>Ativar painel de administração</Link>
+          </div>
+        </div>
+      )}
       {user ? (
         /* Área do comprador */
         <section className="border-b border-line bg-surface">

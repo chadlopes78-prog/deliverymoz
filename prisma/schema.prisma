@@ -291,6 +291,7 @@ model Restaurant {
   statusReason            String?
   approvedAt              DateTime?
   acceptingOrders         Boolean          @default(true) // pausa manual da loja
+  isListed                Boolean          @default(true) // publicado no site (o admin pode despublicar sem suspender)
   prepTimeMinutes         Int              @default(30)
   minOrderCents           Int              @default(0)
   allowRestaurantDelivery Boolean          @default(true)

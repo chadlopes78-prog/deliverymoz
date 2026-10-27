@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import {
   Menu, X, LogOut, LayoutDashboard, Store, Users, Bike, Receipt, Truck, Wallet, Percent, Megaphone, Ticket, LifeBuoy, UserCog,
   Settings, ScrollText, UtensilsCrossed, FolderTree, Clock, MapPin, Star, Tag, History, User, FileText, Home, Package, BarChart3,
-  ArrowLeftRight, Image, ShieldCheck, BadgeCheck, MessageSquareWarning, CircleHelp, ShoppingBag, Handshake, Activity, ExternalLink, type LucideIcon,
+  ArrowLeftRight, Image, ShieldCheck, BadgeCheck, MessageSquareWarning, CircleHelp, ShoppingBag, Handshake, Activity, ExternalLink, PanelLeftClose, PanelLeftOpen, type LucideIcon,
 } from "lucide-react";
 
 const ICONS = {
@@ -54,7 +54,7 @@ const THEME: Record<Variant, { aside: string; muted: string; idle: string; activ
 };
 
 /** Estrutura dos painéis: barra lateral fixa no computador e gaveta no telemóvel. */
-export function DashboardShell({ brand, title, subtitle, nav, children, logoutAction, topRight, bottomNav, variant = "courier", footerLinks = [] }: {
+export function DashboardShell({ brand, title, subtitle, nav, children, logoutAction, topRight, bottomNav, variant = "courier", footerLinks = [], desktopHeader, collapsible = false }: {
   brand: React.ReactNode;
   title: string;
   subtitle?: string;
@@ -65,21 +65,38 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
   bottomNav?: NavItem[];
   variant?: Variant;
   footerLinks?: { href: string; label: string }[];
+  /** Conteúdo do lado direito do cabeçalho em computador (pesquisa, notificações, perfil). */
+  desktopHeader?: React.ReactNode;
+  /** Permite recolher a barra lateral para ícones (preferência guardada neste navegador). */
+  collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const path = usePathname();
   useEffect(() => setOpen(false), [path]);
+  useEffect(() => {
+    if (!collapsible) return;
+    try { setCollapsed(localStorage.getItem("dm_sidebar") === "1"); } catch { /* sem armazenamento local */ }
+  }, [collapsible]);
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      try { localStorage.setItem("dm_sidebar", c ? "0" : "1"); } catch { /* sem armazenamento local */ }
+      return !c;
+    });
+  };
   const t = THEME[variant];
   const isActive = (i: NavItem) => (i.exact ? path === i.href : path === i.href || path.startsWith(i.href + "/"));
-  const link = (i: NavItem) => {
+  // Secção atual: o item ativo com o caminho mais específico
+  const current = nav.filter(isActive).sort((a, b) => b.href.length - a.href.length)[0];
+  const link = (i: NavItem, compact = false) => {
     const Icon = ICONS[i.icon];
     const active = isActive(i);
     return (
       <li key={i.href}>
-        <Link href={i.href} prefetch={false} aria-current={active ? "page" : undefined} className={cn("flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition", active ? t.active : t.idle)}>
+        <Link href={i.href} prefetch={false} aria-current={active ? "page" : undefined} title={compact ? i.label : undefined} aria-label={compact ? i.label : undefined} className={cn("relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition", compact && "justify-center px-0", active ? t.active : t.idle)}>
           <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
-          <span className="flex-1 truncate">{i.label}</span>
-          {i.badge ? <span className={cn("rounded-full px-1.5 text-xs font-bold", active ? "bg-white/25" : t.badgeIdle)}>{i.badge}</span> : null}
+          {!compact && <span className="flex-1 truncate">{i.label}</span>}
+          {i.badge ? <span className={cn("rounded-full px-1.5 text-xs font-bold", compact && "absolute -right-1 -top-1 text-[10px]", active ? "bg-white/25" : t.badgeIdle)}>{i.badge}</span> : null}
         </Link>
       </li>
     );
@@ -91,16 +108,18 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
     if (last && last.section === i.section) last.items.push(i);
     else groups.push({ section: i.section, items: [i] });
   }
-  const links = (
+  const renderLinks = (compact: boolean) => (
     <div className="space-y-4">
       {groups.map((g, gi) => (
         <div key={g.section ?? gi}>
-          {g.section && <p className={cn("px-3 pb-1 text-[11px] font-bold uppercase tracking-wider", t.muted)}>{g.section}</p>}
-          <ul className="space-y-0.5">{g.items.map(link)}</ul>
+          {g.section && (compact ? <hr className={cn("mx-2 mb-2", t.border)} /> : <p className={cn("px-3 pb-1 text-[11px] font-bold uppercase tracking-wider", t.muted)}>{g.section}</p>)}
+          <ul className="space-y-0.5">{g.items.map((i) => link(i, compact))}</ul>
         </div>
       ))}
     </div>
   );
+  const links = renderLinks(false);
+  const compact = collapsible && collapsed;
   const footer = (
     <div className={cn("space-y-0.5 border-t p-3 pb-safe", t.border)}>
       {footerLinks.map((l) => (
@@ -112,16 +131,36 @@ export function DashboardShell({ brand, title, subtitle, nav, children, logoutAc
     </div>
   );
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[264px_1fr]">
+    <div className={cn("min-h-dvh lg:grid", compact ? "lg:grid-cols-[76px_1fr]" : "lg:grid-cols-[264px_1fr]")}>
       <aside className={cn("sticky top-0 hidden h-dvh flex-col border-r lg:flex", t.aside, t.border)}>
-        <div className={cn("border-b px-4 py-4", t.border)}>{brand}<p className={cn("mt-2 truncate text-xs font-semibold uppercase tracking-wide", t.muted)}>{title}</p>{subtitle && <p className="truncate text-sm font-semibold">{subtitle}</p>}</div>
-        <nav className="flex-1 overflow-y-auto p-3" aria-label={title}>{links}</nav>
-        {footer}
+        {compact ? (
+          <div className={cn("grid place-items-center border-b py-4", t.border)}>{brand}</div>
+        ) : (
+          <div className={cn("border-b px-4 py-4", t.border)}>{brand}<p className={cn("mt-2 truncate text-xs font-semibold uppercase tracking-wide", t.muted)}>{title}</p>{subtitle && <p className="truncate text-sm font-semibold">{subtitle}</p>}</div>
+        )}
+        <nav className={cn("flex-1 overflow-y-auto", compact ? "p-2" : "p-3")} aria-label={title}>{renderLinks(compact)}</nav>
+        {compact ? (
+          <form action={logoutAction} className={cn("border-t p-2", t.border)}><button title="Terminar sessão" aria-label="Terminar sessão" className={cn("grid min-h-10 w-full place-items-center rounded-xl", t.danger)}><LogOut className="h-[18px] w-[18px]" /></button></form>
+        ) : footer}
       </aside>
       <div className="min-w-0">
+        {desktopHeader !== undefined && (
+          <header className="sticky top-0 z-20 hidden h-16 items-center gap-4 border-b border-line bg-surface/95 px-6 backdrop-blur lg:flex">
+            {collapsible && (
+              <button onClick={toggleCollapsed} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl hover:bg-ink/5" aria-label={collapsed ? "Expandir menu" : "Recolher menu"} title={collapsed ? "Expandir menu" : "Recolher menu"}>
+                {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+              </button>
+            )}
+            <div className="min-w-0 flex-1">
+              {current?.section && <p className="truncate text-[11px] font-bold uppercase tracking-wider text-muted">{current.section}</p>}
+              <p className="truncate text-base font-bold">{current?.label ?? title}</p>
+            </div>
+            {desktopHeader}
+          </header>
+        )}
         <header className={cn("sticky top-0 z-30 flex h-14 items-center gap-2 border-b px-3 pt-safe lg:hidden", t.header, t.border)}>
           <button onClick={() => setOpen(true)} className="grid h-11 w-11 place-items-center rounded-full hover:bg-ink/5" aria-label="Abrir menu" aria-expanded={open}><Menu className="h-5 w-5" /></button>
-          <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{subtitle ?? title}</p>{subtitle && <p className={cn("truncate text-[11px]", t.muted)}>{title}</p>}</div>
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{current?.label ?? subtitle ?? title}</p><p className={cn("truncate text-[11px]", t.muted)}>{current ? (subtitle ?? title) : title}</p></div>
           {topRight}
         </header>
         {open && (

@@ -56,7 +56,7 @@ export default async function AdminRestaurantDetail({ params, searchParams }: { 
     <>
       <Link href="/admin/restaurantes" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-brand"><ArrowLeft className="h-4 w-4" /> Restaurantes</Link>
       {sp.criado && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" role="status">Restaurante criado. Para o publicar, defina o horário e as zonas de entrega em <Link href={`/admin/restaurantes/${r.id}/editar`} className="font-semibold underline">Editar</Link> e adicione produtos em <Link href={`/admin/produtos/novo?restaurante=${r.id}`} className="font-semibold underline">Produtos</Link>.</p>}
-      <PageHeader title={r.name} description={`${r.city.name} · registado em ${formatDate(r.createdAt, { dateStyle: "medium" })}`} actions={<><RestaurantOperationalBadge status={r.status} acceptingOrders={r.acceptingOrders} />{manage && <Link href={`/admin/restaurantes/${r.id}/editar`} className={buttonClass("primary", "sm")}>Editar restaurante</Link>}</>} />
+      <PageHeader title={r.name} description={`${r.city.name} · registado em ${formatDate(r.createdAt, { dateStyle: "medium" })}`} actions={<><RestaurantOperationalBadge status={r.status} acceptingOrders={r.acceptingOrders} isListed={r.isListed} />{manage && <Link href={`/admin/restaurantes/${r.id}/editar`} className={buttonClass("primary", "sm")}>Editar restaurante</Link>}</>} />
 
       {manage && <div className="mb-5"><RestaurantStatusActions r={r} /></div>}
       {r.statusReason && <p className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-800">Motivo registado: {r.statusReason}</p>}

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { getSessionUser, type SessionUser } from "./auth/session";
 import { hasAdminPermission, hasRestaurantPermission, restaurantStatusAllows, isAdminUser, type AdminPermission, type RestaurantPermission } from "./permissions";
 import type { RestaurantRole } from "@prisma/client";
+import { ownerExists } from "./services/accounts";
 
 export async function requireUser(next = "/"): Promise<SessionUser> {
   const user = await getSessionUser();
@@ -17,7 +18,10 @@ export async function requireUser(next = "/"): Promise<SessionUser> {
 export async function requireAdmin(permission: AdminPermission = "dashboard.view"): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/admin/login");
-  if (!isAdminUser(user)) redirect("/admin/sem-acesso");
+  if (!isAdminUser(user)) {
+    // Sem proprietário ainda criado, o login administrativo oferece a ativação (com código do servidor).
+    redirect((await ownerExists()) ? "/admin/sem-acesso" : "/admin/login");
+  }
   if (!hasAdminPermission(user, permission)) redirect("/admin?sem-permissao=1");
   return user;
 }

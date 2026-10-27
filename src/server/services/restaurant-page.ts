@@ -24,7 +24,7 @@ export const getPublicRestaurant = cache(async (slug: string) => {
       },
     },
   });
-  if (!r || r.status !== "APPROVED") return null;
+  if (!r || r.status !== "APPROVED" || !r.isListed) return null;
   const settings = await getSettings();
   const now = new Date();
   const toView = (p: (typeof r.products)[number]): MenuProduct => ({

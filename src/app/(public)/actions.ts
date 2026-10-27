@@ -6,7 +6,7 @@ import { runAction, str, optStr, type ActionResult } from "@/server/action";
 import { AppError } from "@/server/errors";
 import { getSessionUser, createSession, destroySession } from "@/server/auth/session";
 import { requestInfo } from "@/server/request";
-import { authenticate, registerCustomer, requestPasswordReset, resetPassword } from "@/server/services/accounts";
+import { authenticate, registerCustomer, requestPasswordReset, resetPassword, needsOwnerActivation } from "@/server/services/accounts";
 import { mergeAnonymousCart, addToCart, updateCartItem, clearCart, setCartCoupon } from "@/server/services/cart";
 import { getCartRef, CART_COOKIE } from "@/server/cart-ref";
 import { sha256 } from "@/server/auth/tokens";
@@ -43,13 +43,19 @@ export async function loginAction(_: ActionResult, fd: FormData): Promise<Action
 }
 
 export async function registerAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  let registered: { email: string | null } | null = null;
   const result = await runAction(async () => {
     if (fd.get("accept") !== "on") throw new AppError("VALIDATION", "Aceite os termos e a política de privacidade.");
     const { ip } = await requestInfo();
     const user = await registerCustomer({ name: str(fd, "name"), email: str(fd, "email"), phone: str(fd, "phone"), password: String(fd.get("password") ?? "") }, ip);
     await afterLogin(user.id);
+    registered = user;
   });
-  if (result?.ok) redirect(str(fd, "intent") === "parceiro" ? "/parceiro/registo" : safeNext(optStr(fd, "next")));
+  if (result?.ok) {
+    const r = registered as { email: string | null } | null;
+    if (r && (await needsOwnerActivation({ email: r.email, isSuperAdmin: false }))) redirect("/admin/login");
+    redirect(str(fd, "intent") === "parceiro" ? "/parceiro/registo" : safeNext(optStr(fd, "next")));
+  }
   return result;
 }
 

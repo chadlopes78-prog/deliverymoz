@@ -4,14 +4,15 @@ import { redirect } from "next/navigation";
 import { ShieldCheck, Lock } from "lucide-react";
 import { getSessionUser } from "@/server/auth/session";
 import { isAdminUser } from "@/server/permissions";
-import { ownerExists } from "@/server/services/accounts";
+import { ownerExists, ownerEmail } from "@/server/services/accounts";
 import { getSettings } from "@/server/services/settings";
 import { Logo } from "@/components/logo";
 import { ActionForm } from "@/components/ui/action-form";
 import { Field, Input } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/button";
 import { adminLoginAction } from "@/app/admin/actions";
-import { setupOwnerAction } from "@/app/configuracao/actions";
+import { setupOwnerAction, activateOwnerAction } from "@/app/configuracao/actions";
+import { logoutAction } from "@/app/(public)/actions";
 
 export const metadata: Metadata = { title: "Entrar no painel" };
 
@@ -21,6 +22,7 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
   if (user && isAdminUser(user)) redirect(next?.startsWith("/admin") ? next : "/admin");
   const [hasOwner, settings] = await Promise.all([ownerExists(), getSettings()]);
   const tokenConfigured = (process.env.SETUP_TOKEN ?? "").length >= 16;
+  const allowedEmail = ownerEmail();
 
   return (
     <div className="w-full max-w-md">
@@ -40,6 +42,27 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
               <SubmitButton size="lg" className="w-full" pendingText="A verificar…"><Lock className="h-4 w-4" /> Entrar no painel</SubmitButton>
             </ActionForm>
           </>
+        ) : user ? (
+          <>
+            <h1 className="mt-4 text-2xl font-bold">Ativar o painel de administração</h1>
+            <p className="mt-1 text-sm text-muted">
+              Tem sessão iniciada como <strong>{user.name}</strong> ({user.email}). Esta conta ainda não tem o papel de proprietário da plataforma, por isso o site mostra-lhe a área de compras.
+            </p>
+            {allowedEmail && user.email?.toLowerCase() !== allowedEmail ? (
+              <>
+                <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Esta conta não é a conta autorizada a ser proprietária da plataforma. Termine a sessão e entre com a conta correta.</p>
+                <form action={logoutAction} className="mt-4"><button className="w-full rounded-xl border border-line px-4 py-3 text-sm font-semibold hover:bg-ink/5">Terminar sessão</button></form>
+              </>
+            ) : !tokenConfigured ? (
+              <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Defina a variável de ambiente <code className="font-mono">SETUP_TOKEN</code> (mínimo 16 caracteres) no servidor e volte a publicar a aplicação.</p>
+            ) : (
+              <ActionForm action={activateOwnerAction} className="mt-6 space-y-4">
+                <Field label="Código de configuração" htmlFor="setupToken" hint="Valor da variável SETUP_TOKEN definida na Vercel."><Input id="setupToken" name="setupToken" type="password" required autoComplete="off" /></Field>
+                <Field label="Palavra-passe atual desta conta" htmlFor="password"><Input id="password" name="password" type="password" required autoComplete="current-password" /></Field>
+                <SubmitButton size="lg" className="w-full" pendingText="A ativar…"><ShieldCheck className="h-4 w-4" /> Ativar e entrar no painel</SubmitButton>
+              </ActionForm>
+            )}
+          </>
         ) : (
           <>
             <h1 className="mt-4 text-2xl font-bold">Criar a conta do proprietário</h1>
@@ -50,7 +73,7 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
               <ActionForm action={setupOwnerAction} className="mt-6 space-y-4">
                 <Field label="Código de configuração" htmlFor="setupToken"><Input id="setupToken" name="setupToken" type="password" required autoComplete="off" /></Field>
                 <Field label="Nome" htmlFor="name"><Input id="name" name="name" required autoComplete="name" /></Field>
-                <Field label="E-mail" htmlFor="email"><Input id="email" name="email" type="email" required autoComplete="email" /></Field>
+                <Field label="E-mail" htmlFor="email"><Input id="email" name="email" type="email" required autoComplete="email" defaultValue={allowedEmail ?? undefined} /></Field>
                 <Field label="Telefone" htmlFor="phone" hint="Número moçambicano, ex.: 84 123 4567"><Input id="phone" name="phone" type="tel" required autoComplete="tel" /></Field>
                 <Field label="Palavra-passe" htmlFor="password" hint="Mínimo 12 caracteres, com letras e números."><Input id="password" name="password" type="password" required minLength={12} autoComplete="new-password" /></Field>
                 <SubmitButton size="lg" className="w-full" pendingText="A criar…">Criar conta e entrar no painel</SubmitButton>

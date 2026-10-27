@@ -18,7 +18,7 @@ export default async function Audit({ searchParams }: { searchParams: Promise<{ 
   const { page, pageSize, skip, take } = pageParams(sp, 50);
   return (
     <>
-      <PageHeader title="Auditoria e registos" description="Ações administrativas, erros do sistema e envios de e-mail." />
+      <PageHeader title="Segurança e auditoria" description="Ações administrativas, erros do sistema e envios de e-mail." />
       <Tabs base="/admin/auditoria" current={tab} tabs={[["acoes", "Ações"], ["erros", "Erros"], ["emails", "E-mails"], ["webhooks", "Webhooks"]]} />
       {tab === "acoes" && <Actions page={page} pageSize={pageSize} skip={skip} take={take} />}
       {tab === "erros" && <Errors skip={skip} take={take} page={page} pageSize={pageSize} />}

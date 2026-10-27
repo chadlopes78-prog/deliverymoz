@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../.."
 export E2E_DATABASE_URL="${E2E_DATABASE_URL:-postgresql://deliverymoz:deliverymoz@localhost:5432/deliverymoz_e2e}"
 if [[ "$E2E_DATABASE_URL" != *e2e* ]]; then echo "E2E_DATABASE_URL tem de apontar para uma base de dados E2E"; exit 1; fi
 export DATABASE_URL="$E2E_DATABASE_URL" DIRECT_URL="$E2E_DATABASE_URL"
-export SETUP_TOKEN="e2e-setup-token-0123456789" CRON_SECRET="e2e-cron" APP_URL="http://localhost:${E2E_PORT:-3100}"
+export SETUP_TOKEN="e2e-setup-token-0123456789" OWNER_EMAIL="owner@e2e.test" CRON_SECRET="e2e-cron" APP_URL="http://localhost:${E2E_PORT:-3100}"
 npx prisma migrate deploy >/dev/null
 node tests/e2e/clean-db.mjs
 if [[ "${SKIP_BUILD:-0}" != "1" ]]; then npx next build >/dev/null; fi

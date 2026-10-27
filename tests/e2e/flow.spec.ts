@@ -53,41 +53,92 @@ test.describe.serial("fluxo completo", () => {
     await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2Fprodutos/);
   });
 
-  test("criação segura da conta do proprietário e login administrativo", async ({ page }) => {
-    await page.goto("/configuracao");
-    await expect(page).toHaveURL(/\/admin\/login/);
-    await page.getByLabel("Código de configuração").fill("errado-errado-errado");
-    await page.getByLabel("Nome").fill(OWNER.name);
+  test("conta do proprietário registada como compradora é ativada e entra no painel (sem ficar na localização)", async ({ page, browser }) => {
+    // Cenário real: o proprietário criou primeiro uma conta normal no site
+    await page.goto("/registar");
+    await page.getByLabel("Nome completo").fill(OWNER.name);
     await page.getByLabel("E-mail").fill(OWNER.email);
     await page.getByLabel("Telefone").fill(OWNER.phone);
     await page.getByLabel("Palavra-passe").fill(OWNER.password);
-    await page.getByRole("button", { name: "Criar conta e entrar no painel" }).click();
+    await page.getByLabel(/Li e aceito/).check();
+    await page.getByRole("button", { name: "Criar conta" }).click();
+    // Em vez da página de localização, vai para a ativação do painel
+    await page.waitForURL("**/admin/login");
+    await expect(page.getByRole("heading", { name: "Ativar o painel de administração" })).toBeVisible();
+    // Na página inicial aparece o aviso de ativação
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "Ativar painel de administração" })).toBeVisible();
+    // /admin leva à ativação enquanto não houver proprietário
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/admin\/login/);
+    await page.getByLabel("Código de configuração").fill("errado-errado-errado");
+    await page.getByLabel("Palavra-passe atual desta conta").fill(OWNER.password);
+    await page.getByRole("button", { name: "Ativar e entrar no painel" }).click();
     await expect(page.getByText("Código de configuração inválido.")).toBeVisible();
     await page.getByLabel("Código de configuração").fill("e2e-setup-token-0123456789");
-    await page.getByRole("button", { name: "Criar conta e entrar no painel" }).click();
+    await page.getByLabel("Palavra-passe atual desta conta").fill("palavra-errada-1");
+    await page.getByRole("button", { name: "Ativar e entrar no painel" }).click();
+    await expect(page.getByText("A palavra-passe atual está incorreta.")).toBeVisible();
+    await page.getByLabel("Palavra-passe atual desta conta").fill(OWNER.password);
+    await page.getByRole("button", { name: "Ativar e entrar no painel" }).click();
     await page.waitForURL((u) => u.pathname === "/admin");
     await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
     // Menu agrupado
     for (const section of ["Gestão comercial", "Pessoas", "Operações", "Financeiro e relatórios", "Marketing", "Administração", "Suporte"]) {
       await expect(page.getByText(section, { exact: true }).first()).toBeAttached();
     }
-    // Terminar sessão e voltar a entrar pelo login administrativo
+    // A ativação só acontece uma vez
+    await page.goto("/configuracao");
+    await expect(page).toHaveURL(/\/admin$/);
+
+    // Terminar sessão e voltar a entrar pela opção de comprador: vai direto para o centro de controlo
     await page.getByRole("button", { name: "Terminar sessão" }).first().click();
     await page.waitForURL("**/admin/login");
-    await expect(page.getByRole("heading", { name: "Painel administrativo" })).toBeVisible();
-    await page.getByLabel("E-mail").fill(OWNER.email);
+    await page.goto("/entrar/comprador");
+    await page.getByLabel("E-mail ou telefone").fill(OWNER.email);
     await page.getByLabel("Palavra-passe").fill("palavra-errada-123");
-    await page.getByRole("button", { name: "Entrar no painel" }).click();
+    await page.getByRole("button", { name: "Entrar", exact: true }).click();
     await expect(page.getByText(/incorretos|inválid/i).first()).toBeVisible();
     await page.getByLabel("Palavra-passe").fill(OWNER.password);
-    await page.getByRole("button", { name: "Entrar no painel" }).click();
+    await page.getByRole("button", { name: "Entrar", exact: true }).click();
     await page.waitForURL((u) => u.pathname === "/admin");
     await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
+    await expect(page.getByText("Escolher localização")).toHaveCount(0);
     fs.mkdirSync(STATE_DIR, { recursive: true });
     await page.context().storageState({ path: `${STATE_DIR}/owner.json` });
+    // Acesso direto a /admin com sessão válida
+    await page.goto("/admin");
+    await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
     // Com sessão, o login administrativo leva diretamente ao painel
     await page.goto("/admin/login");
     await expect(page).toHaveURL(/\/admin$/);
+    void browser;
+  });
+
+  test("todas as abas do centro de controlo abrem com conteúdo", async ({ browser }) => {
+    const page = await newPage(browser, `${STATE_DIR}/owner.json`);
+    const tabs: [string, RegExp | string][] = [
+      ["/admin/restaurantes", "Gestão de restaurantes"], ["/admin/pedidos", /Pedidos/], ["/admin/produtos", "Gestão de produtos"],
+      ["/admin/categorias", "Categorias do cardápio"], ["/admin/compradores", "Compradores"], ["/admin/parceiros", "Parceiros"],
+      ["/admin/utilizadores", "Utilizadores"], ["/admin/entregadores", /Entregadores/], ["/admin/entregas", /Entregas/],
+      ["/admin/vendas", "Vendas"], ["/admin/comissoes", /Comiss/], ["/admin/transacoes", "Transações"],
+      ["/admin/promocoes", /Promoções/], ["/admin/cupons", /Cup/], ["/admin/banners", "Banners"],
+      ["/admin/aprovacoes", "Aprovação de restaurantes"], ["/admin/administradores", "Administradores e permissões"],
+      ["/admin/atividade", "Atividade da plataforma"], ["/admin/configuracoes", /Configura/], ["/admin/auditoria", /Auditoria|Segurança/],
+      ["/admin/reclamacoes", "Reclamações"], ["/admin/pedidos-de-ajuda", "Pedidos de ajuda"], ["/admin/notificacoes", "Notificações"],
+      ["/admin/pesquisa?q=xy", "Pesquisa"],
+    ];
+    for (const [path, heading] of tabs) {
+      const res = await page.goto(path);
+      expect(res?.status(), path).toBe(200);
+      await expect(page.getByRole("heading", { level: 1, name: heading }).first(), path).toBeVisible();
+    }
+    // Navegação pelo menu lateral
+    await page.goto("/admin");
+    await page.getByRole("navigation", { name: "Centro de controlo" }).first().getByRole("link", { name: "Produtos" }).click();
+    await expect(page).toHaveURL(/\/admin\/produtos/);
+    await page.getByRole("navigation", { name: "Centro de controlo" }).first().getByRole("link", { name: "Compradores" }).click();
+    await expect(page).toHaveURL(/\/admin\/compradores/);
   });
 
   test("admin configura região e pagamentos, cria e edita restaurante", async ({ browser }) => {

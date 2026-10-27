@@ -270,6 +270,14 @@ export async function adminUpdateRestaurant(adminId: string, restaurantId: strin
   await audit({ actorId: adminId, action: "restaurant.admin_update", entityType: "Restaurant", entityId: restaurantId });
 }
 
+/** Publica ou despublica um restaurante no site (sem o suspender nem alterar a aprovação). */
+export async function adminSetListed(adminId: string, restaurantId: string, listed: boolean) {
+  await assertAdmin(adminId, "restaurants.manage");
+  const res = await db.restaurant.updateMany({ where: { id: restaurantId }, data: { isListed: listed } });
+  if (!res.count) throw new AppError("NOT_FOUND", "Restaurante não encontrado.");
+  await audit({ actorId: adminId, action: listed ? "restaurant.publish" : "restaurant.unpublish", entityType: "Restaurant", entityId: restaurantId });
+}
+
 /** Pausa ou retoma a receção de pedidos a partir do Admin. */
 export async function adminSetAcceptingOrders(adminId: string, restaurantId: string, accepting: boolean) {
   await assertAdmin(adminId, "restaurants.manage");
@@ -397,6 +405,7 @@ export async function restaurantReadiness(restaurantId: string) {
   });
   const items = [
     { key: "approved", label: "Aprovação da plataforma", done: r.status === "APPROVED", href: null },
+    { key: "listed", label: "Publicado no site", done: r.isListed, href: null },
     { key: "hours", label: "Horário de funcionamento", done: r._count.hours > 0, href: "/parceiro/horarios" },
     { key: "zones", label: "Zonas de entrega", done: r._count.zones > 0, href: "/parceiro/entregas" },
     { key: "products", label: "Pelo menos um produto ativo", done: r._count.products > 0, href: "/parceiro/cardapio" },

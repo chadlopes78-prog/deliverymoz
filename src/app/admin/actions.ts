@@ -527,6 +527,17 @@ export async function adminRestaurantPauseAction(_: ActionResult, fd: FormData):
   });
 }
 
+export async function adminRestaurantListAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("restaurants.manage");
+  return runAction(async () => {
+    const { adminSetListed } = await import("@/server/services/restaurants");
+    const listed = bool(fd, "listed");
+    await adminSetListed(admin.id, str(fd, "id"), listed);
+    revalidatePath("/", "layout");
+    return { ok: true, message: listed ? "Restaurante publicado no site." : "Restaurante despublicado: deixa de aparecer no site." };
+  });
+}
+
 export async function adminHoursAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const admin = await requireAdmin("restaurants.manage");
   return runAction(async () => {
@@ -652,4 +663,13 @@ export async function adminCategoryMoveAction(_: ActionResult, fd: FormData): Pr
     await moveMenuCategory(admin.id, await categoryRestaurant(id), id, str(fd, "dir") === "up" ? -1 : 1);
     revalidatePath("/", "layout");
   });
+}
+
+export async function adminMarkNotificationsReadAction(): Promise<ActionResult> {
+  const admin = await requireAdmin("dashboard.view");
+  return runAction(async () => {
+    const { markNotificationsRead } = await import("@/server/services/customer");
+    await markNotificationsRead(admin.id);
+    revalidatePath("/admin", "layout");
+  }, "Notificações marcadas como lidas.");
 }

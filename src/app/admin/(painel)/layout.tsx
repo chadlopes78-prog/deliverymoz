@@ -6,19 +6,22 @@ import { hasAdminPermission, type AdminPermission } from "@/server/permissions";
 import { db } from "@/server/db";
 import { adminLogoutAction } from "@/app/admin/actions";
 import { COMPLAINT_CATEGORIES } from "@/server/services/support";
+import { AdminHeaderTools } from "@/components/admin/admin-header-tools";
 
 export const metadata: Metadata = { title: { default: "Administração", template: "%s · Administração" }, robots: { index: false, follow: false } };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdmin("dashboard.view");
-  const [pendingRestaurants, pendingCouriers, openTickets, searching, pendingRefunds, openComplaints] = await Promise.all([
+  const [pendingRestaurants, pendingCouriers, openTickets, searching, pendingRefunds, openComplaints, unread] = await Promise.all([
     db.restaurant.count({ where: { status: "PENDING" } }),
     db.courier.count({ where: { status: "PENDING" } }),
     db.supportTicket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] } } }),
     db.delivery.count({ where: { status: "SEARCHING", order: { status: { in: ["ACCEPTED", "PREPARING", "READY_FOR_PICKUP"] } } } }),
     db.refund.count({ where: { status: "PENDING" } }),
     db.supportTicket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] }, category: { in: COMPLAINT_CATEGORIES } } }),
+    db.notification.count({ where: { userId: user.id, readAt: null } }),
   ]);
+  const role = user.isSuperAdmin ? "Super Admin" : "Administrador";
   const G = { dash: "Dashboard", com: "Gestão comercial", people: "Pessoas", ops: "Operações", fin: "Financeiro e relatórios", mkt: "Marketing", adm: "Administração", sup: "Suporte" };
   const items: (NavItem & { perm: AdminPermission })[] = [
     { section: G.dash, href: "/admin", label: "Visão geral", icon: "LayoutDashboard", exact: true, perm: "dashboard.view" },
@@ -55,6 +58,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       nav={nav}
       logoutAction={adminLogoutAction}
       footerLinks={[{ href: "/", label: "Ver o site" }, ...(user.restaurantMembers.length ? [{ href: "/parceiro", label: "Painel do meu restaurante" }] : [])]}
+      collapsible
+      desktopHeader={<AdminHeaderTools name={user.name} email={user.email} role={role} unread={unread} logoutAction={adminLogoutAction} />}
+      topRight={<AdminHeaderTools name={user.name} email={user.email} role={role} unread={unread} logoutAction={adminLogoutAction} compact />}
     >
       {children}
     </DashboardShell>
